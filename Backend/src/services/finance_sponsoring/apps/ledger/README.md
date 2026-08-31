@@ -1,0 +1,1 @@
+L'application ledger gere le grand livre comptable, écritures recettes/dépenses. Elle peut etre liée à l'application invoicing.

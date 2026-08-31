@@ -1,0 +1,1 @@
+L'application banking gere le rapprochement bancaire et les relevés de compte. Elle peut etre liée à l'application ledger.

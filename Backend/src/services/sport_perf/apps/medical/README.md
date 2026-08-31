@@ -1,0 +1,1 @@
+L'application medical gere les registres blessures, kiné, autorisations de reprise. Elle peut etre liée à l'application membres.

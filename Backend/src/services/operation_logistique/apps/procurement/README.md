@@ -1,0 +1,1 @@
+L'application procurement gere les bons de commande matériel & achats fournisseurs. Elle peut etre liée à l'application inventory et à l'application fleet.

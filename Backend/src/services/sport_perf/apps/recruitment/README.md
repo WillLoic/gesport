@@ -1,0 +1,1 @@
+L'application recruitment gere le scouting, les détections et le radar de compétences. Elle peut etre liée à l'application membres.

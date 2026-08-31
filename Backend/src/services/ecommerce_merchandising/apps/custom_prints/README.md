@@ -1,0 +1,1 @@
+L'application custom_prints gere les options flocages personnalisés (Nom + N°). Elle peut etre liée à l'application catalog.

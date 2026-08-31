@@ -1,0 +1,1 @@
+L'application maintenance gere les contrôles techniques, révisions et états des lieux. Elle peut etre liée à l'application fleet.

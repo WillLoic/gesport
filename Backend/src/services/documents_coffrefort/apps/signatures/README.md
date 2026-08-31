@@ -1,0 +1,1 @@
+L'application signatures gere les signatures électroniques de contrats. Elle peut etre liée à l'application hr_contracts.

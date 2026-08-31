@@ -1,0 +1,1 @@
+L'application payments gere les paiements Stripe/CB/Pass'Sport... . Elle peut etre liée à l'application orders.

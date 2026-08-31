@@ -1,0 +1,1 @@
+L'application teams gere les équipes, catégories et affectation coachs. Elle peut etre liée à l'application membres.

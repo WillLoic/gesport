@@ -1,0 +1,1 @@
+L'application campaigns gere les campagnes emailing et sms. 

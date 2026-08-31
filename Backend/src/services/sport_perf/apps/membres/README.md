@@ -1,0 +1,1 @@
+L'application membres gere les registres licenciés, licences fédérales et adhésions.

@@ -1,0 +1,1 @@
+L'application loans gere les emprunts de matériel par les coachs et utilisateurs. Elle peut etre liée à l'application inventory.

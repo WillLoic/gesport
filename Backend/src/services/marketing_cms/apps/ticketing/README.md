@@ -1,0 +1,1 @@
+L'application ticketing gere la billetterie événements, matchs de gala & stages. Elle peut etre liée à l'application campaigns.

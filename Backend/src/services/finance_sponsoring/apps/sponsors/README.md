@@ -1,0 +1,1 @@
+L'application sponsors gere les partenaires, contrats B2B, packs & contreparties.

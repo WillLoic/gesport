@@ -1,0 +1,1 @@
+L'application invoicing gere les factures officielles, devis, TVA & relances. Elle peut etre liée à l'application ledger.

@@ -1,0 +1,1 @@
+L'application competitions gere les matchs, convocations, feuilles de match, stats et MVP. Elle peut etre liée à l'application teams et à l'application membres.

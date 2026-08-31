@@ -1,0 +1,1 @@
+L'application hr_contracts gere les contrats de travail staff, congés & remplacements. Elle peut etre liée à l'application signatures.

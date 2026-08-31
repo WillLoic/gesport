@@ -1,0 +1,1 @@
+L'application accounts gere les utilisateurs, profils utilisateurs, le password reset et la 2FA

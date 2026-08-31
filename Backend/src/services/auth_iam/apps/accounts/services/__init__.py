@@ -1,0 +1,1 @@
+# 💡 Logique métier et calculs (hors des views)

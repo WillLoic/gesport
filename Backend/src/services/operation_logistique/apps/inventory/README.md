@@ -1,0 +1,1 @@
+L'application inventory gere le matériel sportif, stocks mini, lieux de rangement.

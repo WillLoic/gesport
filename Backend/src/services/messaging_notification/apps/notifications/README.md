@@ -1,0 +1,1 @@
+L'application notifications gere les notifications push & in-app. Elle peut etre liée à l'application chat et à l'application direct_messages. Elle utilise Redis pour la communication entre les différentes instances du serveur. 

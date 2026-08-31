@@ -1,0 +1,1 @@
+L'application orders gere les paniers, commandes et retrait au club. Elle peut etre liée à l'application inventory_variants et à l'application custom_prints.

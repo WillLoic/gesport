@@ -1,0 +1,1 @@
+L'application vault gere les documents confidentiels, chiffrement AES-256, URLs S3 signées.

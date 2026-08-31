@@ -1,0 +1,1 @@
+L'application governance gere les Assemblées Générales (AG), convocations, PV signés. Elle peut etre liée à l'application vault et à l'application hr_contracts.

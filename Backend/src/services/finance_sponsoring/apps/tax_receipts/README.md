@@ -1,0 +1,1 @@
+L'application tax_receipts gere la génération automatique des reçus Cerfa (Mécénat). Elle peut etre liée à l'application sponsors et à l'application ledger.

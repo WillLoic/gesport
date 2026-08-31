@@ -1,0 +1,1 @@
+L'application catalog gere les produits boutique, catégories, photos

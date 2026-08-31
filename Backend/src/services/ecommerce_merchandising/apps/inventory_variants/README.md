@@ -1,0 +1,1 @@
+L'application inventory_variants gere les déclinaisons de tailles (S, M, L...) & stocks. Elle peut etre liée à l'application catalog.
