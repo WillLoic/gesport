@@ -1,12 +1,11 @@
-# Environment Variables (CRITICAL — Never commit!)
+# Environment variables — NEVER commit .env files
 .env
 .env.local
 .env.*.local
 .env.prod
 .env.staging
-.env.production
 
-# Python & Virtual Environments
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -33,17 +32,13 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-.venv/
 
-# Django
-*.log
-*.sqlite3
-*.sqlite3-journal
-/media/
-/static/
-/staticfiles/
-local_settings.py
-db.sqlite3
+# Virtual environments
+.venv/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # IDEs
 .vscode/
@@ -54,6 +49,28 @@ db.sqlite3
 .DS_Store
 *.sublime-project
 *.sublime-workspace
+
+# Database
+*.sqlite3
+*.sqlite3-journal
+*.db
+
+# Django
+*.log
+/media/
+/static/
+/staticfiles/
+local_settings.py
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+build/
+*.tgz
+package-lock.json
+bun.lock
 
 # OS
 .DS_Store
@@ -68,16 +85,25 @@ Thumbs.db
 docker-compose.override.yml
 .dockerignore
 
-# Coverage & Testing
+# IDE settings
+.settings/
+.project
+.pydevproject
+.classpath
+
+# Coverage
 .coverage
 .coverage.*
 htmlcov/
+coverage.xml
+*.cover
+
+# Pytest
 .pytest_cache/
 .tox/
 .hypothesis/
-coverage.xml
 
-# MyPy & Type Checking
+# MyPy
 .mypy_cache/
 .dmypy.json
 dmypy.json
@@ -86,16 +112,16 @@ dmypy.json
 *.pem
 *.key
 *.p12
+.aws/
 secrets/
 config/local/
-.aws/
 
 # Build artifacts
 dist/
 build/
+*.egg-info/
 
-# Temporary files
+# Temp files
 tmp/
 temp/
 *.tmp
-*.swp
