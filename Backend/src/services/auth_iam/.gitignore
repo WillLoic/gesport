@@ -43,7 +43,6 @@ MANIFEST
 /static/
 /staticfiles/
 local_settings.py
-db.sqlite3
 
 # IDEs
 .vscode/
@@ -66,7 +65,6 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
-.dockerignore
 
 # Coverage & Testing
 .coverage
@@ -75,12 +73,6 @@ htmlcov/
 .pytest_cache/
 .tox/
 .hypothesis/
-coverage.xml
-
-# MyPy & Type Checking
-.mypy_cache/
-.dmypy.json
-dmypy.json
 
 # Credentials & Secrets
 *.pem
@@ -90,12 +82,7 @@ secrets/
 config/local/
 .aws/
 
-# Build artifacts
-dist/
-build/
-
 # Temporary files
 tmp/
 temp/
 *.tmp
-*.swp
