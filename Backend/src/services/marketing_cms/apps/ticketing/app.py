@@ -1,0 +1,9 @@
+"""AppConfig pour l'application ticketing (Billetterie & QR Codes)."""
+
+from django.apps import AppConfig
+
+
+class TicketingConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.ticketing'
+    verbose_name = 'Billetterie & QR Codes'
