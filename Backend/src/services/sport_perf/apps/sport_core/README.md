@@ -1,0 +1,1 @@
+L'application sport_core gere la gestion et plannification des entrainements. peut etre lie a l'application tactic

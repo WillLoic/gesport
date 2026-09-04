@@ -1,0 +1,1 @@
+L'application schedule gere le calendrier sportif (des matchs qui arrivent) et la liste des joueurs convoque par match 
