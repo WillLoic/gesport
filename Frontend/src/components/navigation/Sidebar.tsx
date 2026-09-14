@@ -28,13 +28,15 @@ import {
   MessageSquare,
   Mail,
   Globe,
+  Sparkles,
   PieChart,
   ChevronRight,
+  ChevronDown,
   X,
-  Lock,
+  Shield,
+  Activity,
 } from 'lucide-react';
 import { useClub, ActiveModule } from '../../context/ClubContext';
-import { useAuth, RoleCode } from '../../context/AuthContext';
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -43,19 +45,16 @@ interface SidebarProps {
   setIsCollapsed: (collapsed: boolean) => void;
 }
 
-interface NavItem {
-  id: ActiveModule;
-  label: string;
-  icon: React.ElementType;
-  badge?: number | string;
-  badgeColor?: string;
-  allowedRoles?: RoleCode[];
-}
-
 interface NavGroup {
   id: string;
   label: string;
-  items: NavItem[];
+  items: {
+    id: ActiveModule;
+    label: string;
+    icon: React.ElementType;
+    badge?: number | string;
+    badgeColor?: string;
+  }[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -72,193 +71,249 @@ export const Sidebar: React.FC<SidebarProps> = ({
     medicalRecords,
     invoices,
     purchaseOrders,
+    channels,
   } = useClub();
-
-  const { activeClub, activeRole, hasRole } = useAuth();
 
   // Dynamic alert counts
   const expiredMembersCount = members.filter(m => m.licenseStatus === 'Expirée' || m.licenseStatus === 'En attente').length;
   const injuredCount = medicalRecords.filter(m => m.status === 'Indisponible' || m.status === 'Réathlétisation').length;
   const overdueInvoicesCount = invoices.filter(i => i.status === 'En retard').length;
   const pendingOrdersCount = purchaseOrders.filter(p => p.status === 'En attente validation').length;
+  const unreadMessages = channels.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+
+  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({
+    overview: true,
+    sport: true,
+    admin: true,
+    facilities: true,
+    finance: true,
+    events: true,
+    analytics: true,
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+  };
 
   const navGroups: NavGroup[] = [
     {
-      id: 'core',
-      label: 'GÉNÉRAL',
+      id: 'overview',
+      label: 'Terrain & Suivi',
       items: [
-        { id: 'dashboard', label: "Vue d'ensemble", icon: LayoutDashboard },
-      ],
-    },
-    {
-      id: 'sport',
-      label: `PÔLE SPORTIF (${currentSportConfig.name.toUpperCase()})`,
-      items: [
-        { id: 'members', label: 'Adhérents & Licenciés', icon: Users, badge: expiredMembersCount > 0 ? expiredMembersCount : undefined, badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
-        { id: 'teams', label: 'Équipes & Effectifs', icon: ShieldAlert },
-        { id: 'calendar', label: 'Matchs & Convocations', icon: Calendar },
-        { id: 'trainings', label: 'Entraînements & Schémas', icon: Dumbbell },
-        { id: 'attendance', label: 'Présences & Pointage', icon: ClipboardCheck },
+        { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+        { id: 'members', label: 'Gestion des Licenciés', icon: Users, badge: expiredMembersCount > 0 ? expiredMembersCount : undefined, badgeColor: 'bg-amber-500 text-white' },
+        { id: 'teams', label: 'Équipes & Compositions', icon: Shield },
+        { id: 'calendar', label: 'Calendrier Sportif', icon: Calendar },
+        { id: 'trainings', label: 'Entraînements & Exercices', icon: Dumbbell },
+        { id: 'attendance', label: 'Pointage & Présences', icon: ClipboardCheck },
         { id: 'match_analytics', label: 'Statistiques & Matchs', icon: BarChart3 },
-        { id: 'medical', label: 'Suivi Médical & Kiné', icon: HeartPulse, badge: injuredCount > 0 ? `${injuredCount} blessés` : undefined, badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30', allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'COACH', 'MEDICAL_STAFF'] },
+        { id: 'medical', label: 'Suivi Médical & Kiné', icon: HeartPulse, badge: injuredCount > 0 ? injuredCount : undefined, badgeColor: 'bg-rose-500 text-white' },
         { id: 'academy', label: 'Académie & Formation', icon: GraduationCap },
-        { id: 'recruitment', label: 'Cellule Recrutement', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'COACH'] },
+        { id: 'recruitment', label: 'Recrutement & Scouting', icon: UserCheck },
       ],
     },
     {
-      id: 'hr_governance',
-      label: 'RH & GOUVERNANCE',
+      id: 'facilities',
+      label: 'Ressources & Stocks',
       items: [
-        { id: 'staff', label: 'Organigramme Staff', icon: Briefcase, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
-        { id: 'contracts', label: 'Contrats & Fiches RH', icon: FileSpreadsheet, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
-        { id: 'leaves', label: 'Congés & Remplaçants', icon: CalendarOff, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
-        { id: 'meetings', label: 'Assemblées & Procès-Verbaux', icon: Vote, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
-        { id: 'documents', label: 'Coffre-fort Documents', icon: FolderLock, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
+        { id: 'inventory', label: 'Stocks & Équipements', icon: Boxes },
+        { id: 'vehicles', label: 'Parc Automobile & Minibus', icon: Truck },
+        { id: 'procurement', label: 'Achats & Fournisseurs', icon: ShoppingBag, badge: pendingOrdersCount > 0 ? pendingOrdersCount : undefined, badgeColor: 'bg-blue-600 text-white' },
+        { id: 'pos', label: 'Caisse Buvette (POS)', icon: Store },
       ],
     },
     {
-      id: 'logistics',
-      label: 'LOGISTIQUE & OPÉRATIONS',
+      id: 'admin',
+      label: 'Gouvernance & RH',
       items: [
-        { id: 'inventory', label: 'Inventaire Matériel', icon: Boxes, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'LOGISTICS', 'COACH'] },
-        { id: 'vehicles', label: 'Flotte Minibus & Résa', icon: Truck, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'LOGISTICS', 'COACH'] },
-        { id: 'procurement', label: 'Achats & Commande', icon: ShoppingBag, badge: pendingOrdersCount > 0 ? pendingOrdersCount : undefined, badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30', allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'LOGISTICS', 'TREASURER'] },
+        { id: 'staff', label: 'Organigramme & Staff', icon: Briefcase },
+        { id: 'contracts', label: 'Contrats & Salaires RH', icon: FileSpreadsheet },
+        { id: 'leaves', label: 'Congés & Remplacements', icon: CalendarOff },
+        { id: 'meetings', label: 'Réunions & Assemblées AG', icon: Vote },
+        { id: 'documents', label: 'GED Documents Officiels', icon: FolderLock },
       ],
     },
     {
       id: 'finance',
-      label: 'FINANCES & SPONSORING',
+      label: 'Comptabilité & Régie',
       items: [
-        { id: 'finance', label: 'Grand Livre Comptable', icon: Receipt, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'TREASURER'] },
-        { id: 'invoices', label: 'Factures & Cotisations', icon: FileText, badge: overdueInvoicesCount > 0 ? `${overdueInvoicesCount} retard` : undefined, badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30', allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'TREASURER'] },
-        { id: 'pos', label: 'Caisse Buvette & Billets', icon: Store, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'TREASURER'] },
-        { id: 'sponsorship', label: 'Sponsors & Reçus Cerfa', icon: BadgeDollarSign, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'TREASURER'] },
-        { id: 'expenses', label: 'Notes de Frais Staff', icon: WalletCards, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'TREASURER'] },
+        { id: 'finance', label: 'Grand Livre & Trésorerie', icon: Receipt },
+        { id: 'invoices', label: 'Facturation & Devis', icon: FileText, badge: overdueInvoicesCount > 0 ? overdueInvoicesCount : undefined, badgeColor: 'bg-red-500 text-white' },
+        { id: 'sponsorship', label: 'Sponsoring & Mécénat', icon: BadgeDollarSign },
+        { id: 'expenses', label: 'Notes de Frais', icon: WalletCards },
       ],
     },
     {
-      id: 'commercial',
-      label: 'COMMERCE & COMMUNICATION',
+      id: 'events',
+      label: 'Marketing & Supporter',
       items: [
-        { id: 'ticketing', label: 'Billetterie Matchs & Stages', icon: Ticket },
-        { id: 'shop', label: 'Boutique Maillots & Flocage', icon: Shirt },
-        { id: 'messaging', label: 'Messagerie Instantanée', icon: MessageSquare },
-        { id: 'marketing', label: 'Campagnes SMS & Emailing', icon: Mail, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
-        { id: 'reporting', label: 'Rapports & Indicateurs KPIs', icon: PieChart, allowedRoles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
+        { id: 'ticketing', label: 'Billetterie & Tournois', icon: Ticket },
+        { id: 'shop', label: 'Boutique du Club', icon: Shirt },
+        { id: 'messaging', label: 'Messagerie Interne', icon: MessageSquare, badge: unreadMessages > 0 ? unreadMessages : undefined, badgeColor: 'bg-blue-500 text-white' },
+        { id: 'marketing', label: 'Campagnes & Emailing', icon: Mail },
+        { id: 'website_cms', label: 'Site Public & Actualités', icon: Globe },
+      ],
+    },
+    {
+      id: 'analytics',
+      label: 'Audit & Intelligence',
+      items: [
+        { id: 'executive_reporting', label: 'Rapports Stratégiques', icon: PieChart },
+        { id: 'ai_assistant', label: 'Assistant Club & IA', icon: Sparkles, badge: 'IA PRO', badgeColor: 'bg-blue-600 text-white' },
       ],
     },
   ];
 
+  const handleSelectModule = (id: ActiveModule) => {
+    setActiveModule(id);
+    if (isMobileOpen) {
+      setIsMobileOpen(false);
+    }
+  };
+
   return (
     <>
-      {/* Overlay mobile */}
+      {/* Mobile overlay */}
       {isMobileOpen && (
         <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 lg:hidden"
           onClick={() => setIsMobileOpen(false)}
-          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden animate-fadeIn"
         />
       )}
 
-      {/* Sidebar container */}
+      {/* Sidebar container with Professional Polish styling */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-slate-900 border-r border-slate-800 transition-all duration-300 ${
-          isCollapsed ? 'w-20' : 'w-72'
-        } ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        id="main-sidebar"
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none
+          ${isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'}
+          ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
+        `}
       >
-        {/* En-tête du Club Multi-Tenant */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800 bg-slate-950/40">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-white text-base shadow-lg shrink-0"
-              style={{ backgroundColor: activeClub?.primary_color || '#1e40af' }}
-            >
-              {activeClub?.short_name?.[0] || 'G'}
+        {/* Brand Header */}
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-800 bg-slate-950">
+          <div
+            className="flex items-center gap-3 overflow-hidden cursor-pointer"
+            onClick={() => handleSelectModule('dashboard')}
+          >
+            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-xs shrink-0 text-base">
+              {currentSportConfig.badge}
             </div>
-
             {!isCollapsed && (
-              <div className="truncate">
-                <h2 className="font-extrabold text-white text-sm tracking-tight truncate">
-                  {activeClub?.name || 'GESPORT'}
-                </h2>
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-blue-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                  Rôle : {activeRole}
-                </div>
+              <div className="min-w-0">
+                <span className="text-base font-bold text-white tracking-tight font-display truncate block">
+                  {currentSportConfig.shortName}
+                </span>
+                <p className="text-[10px] text-blue-400 tracking-wider uppercase font-bold">
+                  {currentSportConfig.name}
+                </p>
               </div>
             )}
           </div>
 
           <button
+            type="button"
+            className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
             onClick={() => setIsMobileOpen(false)}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg lg:hidden"
+            aria-label="Fermer le menu"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation avec filtrage RBAC intelligent */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-6 custom-scrollbar">
+        {/* Scrollable Navigation Groups */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-slate-800">
           {navGroups.map(group => (
-            <div key={group.id} className="space-y-1">
+            <div key={group.id}>
               {!isCollapsed && (
-                <div className="px-3 text-[10px] font-extrabold text-slate-500 tracking-wider uppercase mb-2">
-                  {group.label}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                    {group.label}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    className="text-slate-500 hover:text-slate-300"
+                  >
+                    {openGroups[group.id] ? (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
               )}
 
-              {group.items.map(item => {
-                const Icon = item.icon;
-                const isActive = activeModule === item.id;
-                const isAllowed = !item.allowedRoles || hasRole(item.allowedRoles);
+              {(openGroups[group.id] || isCollapsed) && (
+                <ul className="space-y-1">
+                  {group.items.map(item => {
+                    const Icon = item.icon;
+                    const isActive = activeModule === item.id;
+                    return (
+                      <li key={item.id}>
+                        <button
+                          id={`nav-item-${item.id}`}
+                          type="button"
+                          onClick={() => handleSelectModule(item.id)}
+                          title={isCollapsed ? item.label : undefined}
+                          className={`w-full flex items-center gap-2.5 p-2 rounded-md font-medium text-sm transition-colors cursor-pointer text-left ${
+                            isActive
+                              ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                              : 'hover:bg-slate-800 text-slate-300'
+                          } ${isCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-400'}`} />
 
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (isAllowed) {
-                        setActiveModule(item.id);
-                        setIsMobileOpen(false);
-                      }
-                    }}
-                    disabled={!isAllowed}
-                    title={!isAllowed ? `Accès restreint au rôle ${item.allowedRoles?.join(', ')}` : item.label}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold transition-all group ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
-                        : isAllowed
-                        ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                        : 'text-slate-600 opacity-50 cursor-not-allowed bg-slate-950/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 truncate">
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : isAllowed ? 'text-slate-400 group-hover:text-blue-400' : 'text-slate-600'}`} />
-                      {!isCollapsed && <span className="truncate">{item.label}</span>}
-                    </div>
+                          {!isCollapsed && <span className="truncate flex-1">{item.label}</span>}
 
-                    {!isCollapsed && (
-                      <div className="flex items-center gap-1.5">
-                        {!isAllowed ? (
-                          <Lock className="w-3.5 h-3.5 text-amber-500/70" />
-                        ) : (
-                          item.badge && (
+                          {item.badge !== undefined && (
                             <span
-                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
-                                item.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700'
-                              }`}
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                item.badgeColor || 'bg-blue-600 text-white'
+                              } ${isCollapsed ? 'absolute -top-1 -right-1 text-[9px]' : ''}`}
                             >
                               {item.badge}
                             </span>
-                          )
-                        )}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           ))}
+        </nav>
+
+        {/* Footer User Profile Card */}
+        <div className="p-4 border-t border-slate-800 bg-slate-950/40">
+          {!isCollapsed ? (
+            <div className="flex items-center gap-3 p-2 bg-slate-800/50 rounded-lg border border-slate-800/80">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                JA
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-xs font-semibold text-white truncate">Jean Admin</p>
+                <p className="text-[10px] text-slate-400 truncate">Directeur Sportif</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCollapsed(true)}
+                className="hidden lg:flex p-1 text-slate-400 hover:text-white rounded hover:bg-slate-700"
+                title="Réduire le menu"
+              >
+                <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(false)}
+              className="w-full flex justify-center p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              title="Agrandir le menu"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </aside>
     </>
