@@ -1,71 +1,8 @@
-# Frontend .gitignore
-
-# Environment Variables (NEVER commit!)
-.env
-.env.local
-.env.*.local
-.env.production
-.env.staging
-
-# Node.js
 node_modules/
-npm-debug.log
-yarn-error.log
-pnpm-debug.log
-package-lock.json
-yarn.lock
-bun.lock
-
-# Build outputs
-dist/
 build/
-.next/
-out/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-*.sublime-project
-*.sublime-workspace
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Testing
-.coverage
-.nyc_output
+dist/
 coverage/
-cypress/videos/
-cypress/screenshots/
-
-# Development
-.parcel-cache/
-.cache/
-
-# Dependencies
-.pnp
-.pnp.js
-
-# Vite
-.vite/
-
-# Misc
+.DS_Store
 *.log
-*.swp
-.history/
-
-# Temporary
-tmp/
-temp/
-*.tmp
-
+.env*
+!.env.example

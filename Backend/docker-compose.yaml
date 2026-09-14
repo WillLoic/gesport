@@ -1,0 +1,283 @@
+version: '3.8'
+
+services:
+  # ── Base de données PostgreSQL multi-schémas/bases ──────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: gesport_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: gesport
+      POSTGRES_PASSWORD: gesport_pass
+      POSTGRES_DB: gesport_db
+      POSTGRES_MULTIPLE_DATABASES: iam_db,sport_db,finance_db,logistics_db,cms_db,chat_db,vault_db,ecommerce_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gesport -d gesport_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Serveur Redis (Cache, Celery & Channels WebSockets) ─────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: gesport_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Microservice 01 : Auth IAM ──────────────────────────────────────────────
+  auth_iam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_auth_iam
+    restart: always
+    environment:
+      SERVICE_NAME: auth_iam
+      PORT: 8001
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-auth-iam"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: iam_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 02 : Sport & Performance ──────────────────────────────────
+  sport_perf:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_sport_perf
+    restart: always
+    environment:
+      SERVICE_NAME: sport_perf
+      PORT: 8002
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-sport-perf"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: sport_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 03 : Finance & Sponsoring ──────────────────────────────────
+  finance_sponsoring:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_finance_sponsoring
+    restart: always
+    environment:
+      SERVICE_NAME: finance_sponsoring
+      PORT: 8003
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-finance-sponsoring"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: finance_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 04 : Opérations & Logistique ──────────────────────────────
+  operation_logistique:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_operation_logistique
+    restart: always
+    environment:
+      SERVICE_NAME: operation_logistique
+      PORT: 8004
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-operation-logistique"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: logistics_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 05 : Marketing & CMS ───────────────────────────────────────
+  marketing_cms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_marketing_cms
+    restart: always
+    environment:
+      SERVICE_NAME: marketing_cms
+      PORT: 8005
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-marketing-cms"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: cms_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 06 : Messagerie & Notifications (WebSockets Daphne) ───────
+  messaging_notification:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_messaging_notification
+    restart: always
+    environment:
+      SERVICE_NAME: messaging_notification
+      USE_ASGI: "true"
+      PORT: 8006
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-messaging-notification"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: chat_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8006:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 07 : Documents & Coffre-Fort ──────────────────────────────
+  documents_coffrefort:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_documents_coffrefort
+    restart: always
+    environment:
+      SERVICE_NAME: documents_coffrefort
+      PORT: 8007
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-documents-coffrefort"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: vault_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8007:8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 08 : E-commerce & Merchandising ───────────────────────────
+  ecommerce_merchandising:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gesport_ecommerce_merchandising
+    restart: always
+    environment:
+      SERVICE_NAME: ecommerce_merchandising
+      PORT: 8008
+      DEBUG: "1"
+      SECRET_KEY: "dev-secret-key-ecommerce-merchandising"
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gesport
+      DB_PASSWORD: gesport_pass
+      DB_NAME: ecommerce_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8008:8008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── API Gateway Nginx ──────────────────────────────────────────────────────
+  api_gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: gesport_api_gateway
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth_iam
+      - sport_perf
+      - finance_sponsoring
+      - operation_logistique
+      - marketing_cms
+      - messaging_notification
+      - documents_coffrefort
+      - ecommerce_merchandising
+
+volumes:
+  postgres_data:

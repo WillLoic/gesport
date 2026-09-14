@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ClubProvider, useClub } from './context/ClubContext';
-import { AuthProvider } from './context/AuthContext';
 import { Sidebar } from './components/navigation/Sidebar';
 import { TopHeader } from './components/navigation/TopHeader';
 
@@ -8,12 +7,6 @@ import { TopHeader } from './components/navigation/TopHeader';
 import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 import { QuickActionModal } from './components/modals/QuickActionModal';
 import { NotificationDrawer } from './components/modals/NotificationDrawer';
-
-// Auth IAM Modals
-import { AuthModal } from './components/auth/AuthModal';
-import { UserProfileModal } from './components/auth/UserProfileModal';
-import { ClubSwitchModal } from './components/auth/ClubSwitchModal';
-import { RoleManagementModal } from './components/auth/RoleManagementModal';
 
 // Module Components
 import { DashboardView } from './components/modules/DashboardView';
@@ -47,7 +40,7 @@ import { ClubWebsiteCMSView } from './components/modules/ClubWebsiteCMSView';
 import { ExecutiveReportingView } from './components/modules/ExecutiveReportingView';
 
 const MainAppContent: React.FC = () => {
-  const { activeModule, toastMessage, isPublicSiteOpen } = useClub();
+  const { activeModule, toastMessage, isPublicSiteOpen, setIsPublicSiteOpen } = useClub();
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -127,7 +120,11 @@ const MainAppContent: React.FC = () => {
         return <InternalMessagingView />;
       case 'marketing':
         return <MarketingCampaignsView />;
-      case 'reporting':
+      case 'website_cms':
+        return <ClubWebsiteCMSView />;
+      case 'executive_reporting':
+        return <ExecutiveReportingView />;
+      case 'ai_assistant':
         return <ExecutiveReportingView />;
       default:
         return <DashboardView />;
@@ -135,8 +132,8 @@ const MainAppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-blue-600 selection:text-white flex">
-      {/* Navigation de gauche */}
+    <div className="flex h-screen w-full bg-slate-50 font-sans text-slate-900 overflow-hidden select-none">
+      {/* Sidebar navigation */}
       <Sidebar
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
@@ -144,10 +141,10 @@ const MainAppContent: React.FC = () => {
         setIsCollapsed={setIsSidebarCollapsed}
       />
 
-      {/* Main layout container */}
-      <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-          isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'
+      {/* Main Content Area */}
+      <main
+        className={`flex-1 flex flex-col h-full bg-slate-50 overflow-hidden transition-all duration-300 ${
+          isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'
         }`}
       >
         {/* Top Header */}
@@ -159,13 +156,37 @@ const MainAppContent: React.FC = () => {
           isSidebarCollapsed={isSidebarCollapsed}
         />
 
-        {/* Content Body */}
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto max-w-[1920px] mx-auto w-full">
-          {renderActiveModule()}
-        </main>
-      </div>
+        {/* Scrollable Workspace Container */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+          <div className="max-w-7xl mx-auto">{renderActiveModule()}</div>
+        </div>
 
-      {/* Global Modals & Drawers */}
+        {/* Professional Polish Footer Bar */}
+        <footer className="h-10 bg-slate-50 border-t border-slate-200 px-4 sm:px-8 flex items-center justify-between text-[10px] font-medium text-slate-400 shrink-0">
+          <div className="flex items-center gap-6">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span>Serveurs & Base Club opérationnels</span>
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1.5">
+              Dernière synchro : En direct
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span
+              onClick={() => setIsSearchModalOpen(true)}
+              className="hover:text-slate-600 cursor-pointer hidden md:inline"
+            >
+              Recherche globale (Ctrl+K)
+            </span>
+            <span className="hover:text-slate-600 cursor-pointer hidden sm:inline">Support Technique</span>
+            <span className="text-slate-400 font-mono">v3.4.2-PRO</span>
+          </div>
+        </footer>
+      </main>
+
+      {/* Modals & Drawers */}
       <GlobalSearchModal
         isOpen={isSearchModalOpen}
         onClose={() => setIsSearchModalOpen(false)}
@@ -180,12 +201,6 @@ const MainAppContent: React.FC = () => {
         isOpen={isNotificationDrawerOpen}
         onClose={() => setIsNotificationDrawerOpen(false)}
       />
-
-      {/* Modales Auth & IAM */}
-      <AuthModal />
-      <UserProfileModal />
-      <ClubSwitchModal />
-      <RoleManagementModal />
 
       {/* Global Toast Banner */}
       {toastMessage && (
@@ -202,10 +217,8 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ClubProvider>
-        <MainAppContent />
-      </ClubProvider>
-    </AuthProvider>
+    <ClubProvider>
+      <MainAppContent />
+    </ClubProvider>
   );
 }
