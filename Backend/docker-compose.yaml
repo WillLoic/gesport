@@ -50,8 +50,8 @@ services:
       PORT: 8001
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: iam_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
@@ -79,8 +79,8 @@ services:
       PORT: 8002
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: sport_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
@@ -108,8 +108,8 @@ services:
       PORT: 8003
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: finance_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
@@ -137,8 +137,8 @@ services:
       PORT: 8004
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: logistics_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
@@ -166,8 +166,8 @@ services:
       PORT: 8005
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: cms_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
@@ -196,8 +196,8 @@ services:
       PORT: 8006
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: chat_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
@@ -225,8 +225,8 @@ services:
       PORT: 8007
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: vault_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
@@ -254,8 +254,8 @@ services:
       PORT: 8008
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: ecommerce_db
-      DB_USER: gesport
-      DB_PASSWORD: gesport_pass
+      DB_USER: ${POSTGRES_USER:-gesport}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gesport_pass}
       DB_HOST: postgres
       DB_PORT: 5432
       REDIS_HOST: redis
