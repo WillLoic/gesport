@@ -48,6 +48,7 @@ services:
     environment:
       SERVICE_NAME: auth_iam
       PORT: 8001
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: iam_db
       DB_USER: ${POSTGRES_USER:-gesport}
@@ -77,6 +78,7 @@ services:
     environment:
       SERVICE_NAME: sport_perf
       PORT: 8002
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: sport_db
       DB_USER: ${POSTGRES_USER:-gesport}
@@ -106,6 +108,7 @@ services:
     environment:
       SERVICE_NAME: finance_sponsoring
       PORT: 8003
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: finance_db
       DB_USER: ${POSTGRES_USER:-gesport}
@@ -135,6 +138,7 @@ services:
     environment:
       SERVICE_NAME: operation_logistique
       PORT: 8004
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: logistics_db
       DB_USER: ${POSTGRES_USER:-gesport}
@@ -164,6 +168,7 @@ services:
     environment:
       SERVICE_NAME: marketing_cms
       PORT: 8005
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: cms_db
       DB_USER: ${POSTGRES_USER:-gesport}
@@ -194,6 +199,7 @@ services:
       SERVICE_NAME: messaging_notification
       USE_ASGI: "true"
       PORT: 8006
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: chat_db
       DB_USER: ${POSTGRES_USER:-gesport}
@@ -223,6 +229,7 @@ services:
     environment:
       SERVICE_NAME: documents_coffrefort
       PORT: 8007
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: vault_db
       DB_USER: ${POSTGRES_USER:-gesport}
@@ -252,6 +259,7 @@ services:
     environment:
       SERVICE_NAME: ecommerce_merchandising
       PORT: 8008
+      ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: ecommerce_db
       DB_USER: ${POSTGRES_USER:-gesport}
