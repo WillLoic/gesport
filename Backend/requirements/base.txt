@@ -25,6 +25,8 @@ psycopg2-binary==2.9.10
 
 # ─── Environment Variables ────────────────────────────────────────────────────
 python-decouple==3.8
+python-dotenv==1.0.1
+requests==2.32.3
 
 # ─── Async Tasks ──────────────────────────────────────────────────────────────
 celery==5.5.3
