@@ -90,17 +90,14 @@ export const MembersView: React.FC = () => {
     try {
       const createdMember = await memberService.createMember(newMemberData, 1, currentSportConfig.id);
       setMembers(prev => [createdMember, ...prev]);
-    } catch (err) {
-      console.warn('Erreur lors de la création backend du membre, ajout local:', err);
-      const fallbackMember: Member = {
-        ...(newMemberData as Member),
-        id: `m-${Date.now()}`,
-      };
-      setMembers(prev => [fallbackMember, ...prev]);
+      showToast(`Licencié ${newFirstName} ${newLastName} enregistré avec succès en base de données !`);
+    } catch (err: any) {
+      console.error('Erreur lors de la création du membre en BD:', err);
+      showToast(`Erreur lors de l'enregistrement: ${err?.message || 'Serveur indisponible'}`);
+      return;
     }
 
     setIsNewMemberModalOpen(false);
-    showToast(`Licencié ${newFirstName} ${newLastName} enregistré avec succès !`);
     setNewFirstName('');
     setNewLastName('');
     setNewEmail('');
