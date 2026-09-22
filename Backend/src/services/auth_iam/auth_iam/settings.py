@@ -19,7 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # ─── Security ─────────────────────────────────────────────────────────────────
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-changeme-in-production')
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-gesport-super-secret-key-2026-prod-dev')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
 

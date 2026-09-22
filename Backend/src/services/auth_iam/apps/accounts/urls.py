@@ -8,6 +8,7 @@ Toutes ces routes sont accessibles sous le préfixe /api/v1/auth/accounts/
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
+# pyrefly: ignore [missing-import]
 from apps.accounts.views.auth_view import (
     RegisterView,
     LoginView,

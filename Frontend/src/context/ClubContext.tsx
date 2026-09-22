@@ -35,6 +35,7 @@ import {
   SportType,
   SportPresetConfig,
 } from '../types';
+import { memberService } from '../services/memberService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -371,6 +372,20 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 3500);
     return () => clearTimeout(timer);
   }, [toastMessage]);
+
+  // Chargement initial des membres depuis le microservice backend (sport_perf / membres)
+  useEffect(() => {
+    memberService
+      .getMembers(1)
+      .then((remoteMembers) => {
+        if (remoteMembers && remoteMembers.length > 0) {
+          setMembers(remoteMembers);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (membres) non disponible ou vide, conservation des données locales:', err);
+      });
+  }, []);
 
   // Multi-Sport Switcher logic
   const setCurrentSport = (sport: SportType) => {

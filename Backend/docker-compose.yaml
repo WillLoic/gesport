@@ -47,6 +47,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: auth_iam
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       PORT: 8001
       ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
@@ -77,6 +78,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: sport_perf
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       PORT: 8002
       ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
@@ -107,6 +109,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: finance_sponsoring
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       PORT: 8003
       ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
@@ -137,6 +140,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: operation_logistique
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       PORT: 8004
       ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
@@ -167,6 +171,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: marketing_cms
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       PORT: 8005
       ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
@@ -197,6 +202,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: messaging_notification
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       USE_ASGI: "true"
       PORT: 8006
       ALLOWED_HOSTS: "*"
@@ -228,6 +234,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: documents_coffrefort
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       PORT: 8007
       ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
@@ -258,6 +265,7 @@ services:
         required: false
     environment:
       SERVICE_NAME: ecommerce_merchandising
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-gesport-super-secret-key-2026-prod-dev}
       PORT: 8008
       ALLOWED_HOSTS: "*"
       DB_ENGINE: django.db.backends.postgresql
