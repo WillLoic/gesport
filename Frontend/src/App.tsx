@@ -3,6 +3,12 @@ import { ClubProvider, useClub } from './context/ClubContext';
 import { Sidebar } from './components/navigation/Sidebar';
 import { TopHeader } from './components/navigation/TopHeader';
 
+// Auth Pages
+import { LoginPage } from './components/auth/LoginPage';
+import { RegisterPage } from './components/auth/RegisterPage';
+import { authService, UserBackendProfile } from './services/authService';
+import { getAccessToken } from './services/apiClient';
+
 // Modal and Drawer Components
 import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 import { QuickActionModal } from './components/modals/QuickActionModal';
@@ -39,8 +45,13 @@ import { MarketingCampaignsView } from './components/modules/MarketingCampaignsV
 import { ClubWebsiteCMSView } from './components/modules/ClubWebsiteCMSView';
 import { ExecutiveReportingView } from './components/modules/ExecutiveReportingView';
 
-const MainAppContent: React.FC = () => {
-  const { activeModule, toastMessage, isPublicSiteOpen, setIsPublicSiteOpen } = useClub();
+interface MainAppProps {
+  user: UserBackendProfile | null;
+  onLogout: () => void;
+}
+
+const MainAppContent: React.FC<MainAppProps> = ({ user, onLogout }) => {
+  const { activeModule, toastMessage, isPublicSiteOpen, showToast } = useClub();
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -48,12 +59,12 @@ const MainAppContent: React.FC = () => {
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
 
-  // Keyboard shortcut for Ctrl+K
+  // Raccourci clavier Ctrl+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsSearchModalOpen(prev => !prev);
+        setIsSearchModalOpen((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -166,21 +177,22 @@ const MainAppContent: React.FC = () => {
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span>Serveurs & Base Club opérationnels</span>
+              <span>Serveurs & Backend Auth IAM connectés</span>
             </span>
-            <span className="hidden sm:inline-flex items-center gap-1.5">
-              Dernière synchro : En direct
-            </span>
+            {user && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-slate-600 font-semibold">
+                Connecté : {user.email} {user.is_superuser ? '(Superuser)' : ''}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
-            <span
-              onClick={() => setIsSearchModalOpen(true)}
-              className="hover:text-slate-600 cursor-pointer hidden md:inline"
+            <button
+              onClick={onLogout}
+              className="text-red-500 hover:text-red-700 font-bold cursor-pointer"
             >
-              Recherche globale (Ctrl+K)
-            </span>
-            <span className="hover:text-slate-600 cursor-pointer hidden sm:inline">Support Technique</span>
+              Déconnexion
+            </button>
             <span className="text-slate-400 font-mono">v3.4.2-PRO</span>
           </div>
         </footer>
@@ -216,9 +228,71 @@ const MainAppContent: React.FC = () => {
 };
 
 export default function App() {
+  const [authView, setAuthView] = useState<'login' | 'register' | 'app'>('login');
+  const [currentUser, setCurrentUser] = useState<UserBackendProfile | null>(null);
+
+  // Vérifier la présence d'un token JWT valide au chargement
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = getAccessToken();
+      if (token) {
+        try {
+          const user = await authService.getMe();
+          setCurrentUser(user);
+          setAuthView('app');
+        } catch {
+          authService.logout();
+          setAuthView('login');
+        }
+      } else {
+        setAuthView('login');
+      }
+    };
+
+    initAuth();
+
+    const handleAuthExpired = () => {
+      authService.logout();
+      setCurrentUser(null);
+      setAuthView('login');
+    };
+
+    window.addEventListener('gesport_auth_expired', handleAuthExpired);
+    return () => window.removeEventListener('gesport_auth_expired', handleAuthExpired);
+  }, []);
+
+  const handleLoginSuccess = (user: UserBackendProfile) => {
+    setCurrentUser(user);
+    setAuthView('app');
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setCurrentUser(null);
+    setAuthView('login');
+  };
+
+  if (authView === 'login') {
+    return (
+      <LoginPage
+        onLoginSuccess={handleLoginSuccess}
+        onNavigateToRegister={() => setAuthView('register')}
+      />
+    );
+  }
+
+  if (authView === 'register') {
+    return (
+      <RegisterPage
+        onNavigateToLogin={() => setAuthView('login')}
+        onRegisterSuccess={() => setAuthView('login')}
+      />
+    );
+  }
+
   return (
     <ClubProvider>
-      <MainAppContent />
+      <MainAppContent user={currentUser} onLogout={handleLogout} />
     </ClubProvider>
   );
 }

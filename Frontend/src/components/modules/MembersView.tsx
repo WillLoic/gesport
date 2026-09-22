@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { Member, SportCategory, LicenseStatus } from '../../types';
+import { memberService } from '../../services/memberService';
 
 export const MembersView: React.FC = () => {
   const { members, setMembers, teams, currentSportConfig, showToast } = useClub();
@@ -51,15 +52,14 @@ export const MembersView: React.FC = () => {
   const [newEmergencyPhone, setNewEmergencyPhone] = useState('');
   const [newEmergencyRelation, setNewEmergencyRelation] = useState('Parent / Proche');
 
-  const handleCreateMember = (e: React.FormEvent) => {
+  const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFirstName.trim() || !newLastName.trim()) {
       showToast('Veuillez remplir au minimum le prénom et le nom du licencié.');
       return;
     }
     const assignedTeam = teams.find(t => t.id === newTeamId) || teams[0];
-    const newMember: Member = {
-      id: `m-${Date.now()}`,
+    const newMemberData: Partial<Member> = {
       firstName: newFirstName.trim(),
       lastName: newLastName.trim(),
       email: newEmail.trim() || `${newFirstName.toLowerCase()}.${newLastName.toLowerCase()}@club.fr`,
@@ -87,9 +87,20 @@ export const MembersView: React.FC = () => {
       address: 'Métropole',
     };
 
-    setMembers(prev => [newMember, ...prev]);
+    try {
+      const createdMember = await memberService.createMember(newMemberData, 1, currentSportConfig.id);
+      setMembers(prev => [createdMember, ...prev]);
+    } catch (err) {
+      console.warn('Erreur lors de la création backend du membre, ajout local:', err);
+      const fallbackMember: Member = {
+        ...(newMemberData as Member),
+        id: `m-${Date.now()}`,
+      };
+      setMembers(prev => [fallbackMember, ...prev]);
+    }
+
     setIsNewMemberModalOpen(false);
-    showToast(`Licencié ${newMember.firstName} ${newMember.lastName} enregistré avec succès !`);
+    showToast(`Licencié ${newFirstName} ${newLastName} enregistré avec succès !`);
     setNewFirstName('');
     setNewLastName('');
     setNewEmail('');
@@ -131,21 +142,35 @@ export const MembersView: React.FC = () => {
     showToast('Export CSV des licenciés téléchargé avec succès !');
   };
 
-  const handleToggleLicenseValidation = (memberId: string) => {
+  const handleToggleLicenseValidation = async (memberId: string) => {
+    const targetMember = members.find(m => m.id === memberId);
+    if (!targetMember) return;
+    const nextStatus: LicenseStatus = targetMember.licenseStatus === 'Validée' ? 'En attente' : 'Validée';
+    const updatedMember = { ...targetMember, licenseStatus: nextStatus };
+
     setMembers(prev =>
-      prev.map(m => {
-        if (m.id === memberId) {
-          const nextStatus: LicenseStatus = m.licenseStatus === 'Validée' ? 'En attente' : 'Validée';
-          return { ...m, licenseStatus: nextStatus };
-        }
-        return m;
-      })
+      prev.map(m => (m.id === memberId ? updatedMember : m))
     );
+
+    if (!memberId.startsWith('m-')) {
+      try {
+        await memberService.updateMember(memberId, updatedMember, 1, currentSportConfig.id);
+      } catch (err) {
+        console.warn('Erreur mise à jour licence backend:', err);
+      }
+    }
     showToast('Statut de la licence mis à jour !');
   };
 
-  const handleDeleteMember = (memberId: string) => {
+  const handleDeleteMember = async (memberId: string) => {
     if (confirm('Confirmez-vous la suppression de ce licencié ?')) {
+      if (!memberId.startsWith('m-')) {
+        try {
+          await memberService.deleteMember(memberId);
+        } catch (err) {
+          console.warn('Erreur suppression membre backend:', err);
+        }
+      }
       setMembers(prev => prev.filter(m => m.id !== memberId));
       if (selectedMember?.id === memberId) {
         setSelectedMember(null);

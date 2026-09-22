@@ -9,6 +9,7 @@ import {
   ChevronDown,
   SlidersHorizontal,
   Trophy,
+  UserCheck,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { ClubRole, SportType } from '../../types';
@@ -19,6 +20,7 @@ interface TopHeaderProps {
   onOpenSearch: () => void;
   onOpenQuickAction: () => void;
   onOpenNotifications: () => void;
+  onOpenLogin?: () => void;
   isSidebarCollapsed: boolean;
 }
 
@@ -27,6 +29,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenSearch,
   onOpenQuickAction,
   onOpenNotifications,
+  onOpenLogin,
   isSidebarCollapsed,
 }) => {
   const {

@@ -17,7 +17,7 @@ from decouple import config, Csv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-sport-perf-secret-key-2026')
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-gesport-super-secret-key-2026-prod-dev')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
 
