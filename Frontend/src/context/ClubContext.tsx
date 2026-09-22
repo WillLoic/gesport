@@ -36,6 +36,7 @@ import {
   SportPresetConfig,
 } from '../types';
 import { memberService } from '../services/memberService';
+import { teamService } from '../services/teamService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -203,21 +204,16 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const currentSportConfig = SPORT_PRESETS[currentSport] || SPORT_PRESETS.volleyball;
 
-  // States initialized from mockData with localStorage caching
-  const [members, setMembers] = useState<Member[]>(() => {
-    const saved = localStorage.getItem('sportflow_members');
-    return saved ? JSON.parse(saved) : INITIAL_MEMBERS;
-  });
+  // Membres synchronisés avec le microservice sport_perf/membres (initialement vide avant chargement DB)
+  const [members, setMembers] = useState<Member[]>([]);
 
   const [staff, setStaff] = useState<StaffMember[]>(() => {
     const saved = localStorage.getItem('sportflow_staff');
     return saved ? JSON.parse(saved) : INITIAL_STAFF;
   });
 
-  const [teams, setTeams] = useState<Team[]>(() => {
-    const saved = localStorage.getItem('sportflow_teams');
-    return saved ? JSON.parse(saved) : INITIAL_TEAMS;
-  });
+  // Équipes synchronisées avec le microservice sport_perf/teams (initialement vide avant chargement DB)
+  const [teams, setTeams] = useState<Team[]>([]);
 
   const [events, setEvents] = useState<SportEvent[]>(() => {
     const saved = localStorage.getItem('sportflow_events');
@@ -378,12 +374,22 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     memberService
       .getMembers(1)
       .then((remoteMembers) => {
-        if (remoteMembers && remoteMembers.length > 0) {
-          setMembers(remoteMembers);
-        }
+        setMembers(remoteMembers || []);
       })
       .catch((err) => {
-        console.warn('Microservice sport_perf (membres) non disponible ou vide, conservation des données locales:', err);
+        console.warn('Microservice sport_perf (membres) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des équipes depuis le microservice backend (sport_perf / teams)
+  useEffect(() => {
+    teamService
+      .getTeams(1)
+      .then((remoteTeams) => {
+        setTeams(remoteTeams || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (teams) non disponible:', err);
       });
   }, []);
 

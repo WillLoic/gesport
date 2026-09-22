@@ -37,7 +37,7 @@ let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
 
 const onRefreshed = (token: string) => {
-  refreshSubscribers.map((callback) => callback(token));
+  refreshSubscribers.forEach((callback) => callback(token));
   refreshSubscribers = [];
 };
 
@@ -46,7 +46,7 @@ const addRefreshSubscriber = (callback: (token: string) => void) => {
 };
 
 /**
- * Fonction de requête générique
+ * Fonction de requête générique HTTP
  */
 export async function apiFetch<T = any>(
   endpoint: string,
@@ -66,12 +66,23 @@ export async function apiFetch<T = any>(
 
   let response = await fetch(url, { ...options, headers });
 
-  // Gestion de l'invalidation du token (401 Unauthorized)
+  // Gestion du rafraîchissement de token (401 Unauthorized)
   if (response.status === 401 && !endpoint.includes('/auth/accounts/login/')) {
     const refreshToken = getRefreshToken();
 
     if (refreshToken) {
-      if (!isRefreshing) {
+      if (isRefreshing) {
+        // Si un rafraîchissement est déjà en cours, attendre qu'il se termine
+        try {
+          const newToken = await new Promise<string>((resolve) => {
+            addRefreshSubscriber((token: string) => resolve(token));
+          });
+          headers['Authorization'] = `Bearer ${newToken}`;
+          response = await fetch(url, { ...options, headers });
+        } catch {
+          // Si l'attente échoue, continuer vers la gestion d'erreur standard
+        }
+      } else {
         isRefreshing = true;
         try {
           const refreshRes = await fetch(`${API_BASE_URL}/auth/accounts/token/refresh/`, {
@@ -82,28 +93,30 @@ export async function apiFetch<T = any>(
 
           if (refreshRes.ok) {
             const data = await refreshRes.json();
-            setTokens(data.access, refreshToken);
+            const newAccess = data.access;
+            setTokens(newAccess, refreshToken);
             isRefreshing = false;
-            onRefreshed(data.access);
+            onRefreshed(newAccess);
+
+            // Re-tester la requête courante avec le nouveau jeton d'accès
+            headers['Authorization'] = `Bearer ${newAccess}`;
+            response = await fetch(url, { ...options, headers });
           } else {
-            clearTokens();
             isRefreshing = false;
-            window.dispatchEvent(new CustomEvent('gesport_auth_expired'));
+            // Ne déconnecter l'utilisateur QUE si la requête échoie concerne l'authentification IAM principale
+            if (endpoint.includes('/auth/')) {
+              clearTokens();
+              window.dispatchEvent(new CustomEvent('gesport_auth_expired'));
+            }
           }
         } catch (err) {
-          clearTokens();
           isRefreshing = false;
-          window.dispatchEvent(new CustomEvent('gesport_auth_expired'));
+          if (endpoint.includes('/auth/')) {
+            clearTokens();
+            window.dispatchEvent(new CustomEvent('gesport_auth_expired'));
+          }
         }
       }
-
-      // Attendre la résolution de la régénération du token
-      const newToken = await new Promise<string>((resolve) => {
-        addRefreshSubscriber((token: string) => resolve(token));
-      });
-
-      headers['Authorization'] = `Bearer ${newToken}`;
-      response = await fetch(url, { ...options, headers });
     }
   }
 
@@ -123,7 +136,7 @@ export async function apiFetch<T = any>(
     throw error;
   }
 
-  // Pour les requêtes 204 No Content
+  // Pour les réponses 204 No Content
   if (response.status === 204) {
     return {} as T;
   }

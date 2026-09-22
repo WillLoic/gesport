@@ -14,11 +14,12 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { Team, Member, SportCategory } from '../../types';
+import { teamService } from '../../services/teamService';
 import { SportTacticalPitch } from '../common/SportTacticalPitch';
 
 export const TeamsView: React.FC = () => {
   const { teams, setTeams, members, currentSport, currentSportConfig, showToast } = useClub();
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id || 't1');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id || '');
   const [selectedTab, setSelectedTab] = useState<'roster' | 'lineup' | 'stats'>('roster');
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
 
@@ -34,15 +35,14 @@ export const TeamsView: React.FC = () => {
   const selectedTeam = teams.find(t => t.id === selectedTeamId) || teams[0];
   const teamMembers = members.filter(m => m.teamId === selectedTeam?.id);
 
-  const handleCreateTeam = (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) {
       showToast('Veuillez renseigner le nom de l\'équipe.');
       return;
     }
 
-    const newTeam: Team = {
-      id: `t-${Date.now()}`,
+    const newTeamData: Partial<Team> = {
       name: newTeamName.trim(),
       category: newCategory,
       division: newDivision.trim() || 'Championnat Régional',
@@ -59,10 +59,18 @@ export const TeamsView: React.FC = () => {
       ranking: teams.length + 1,
     };
 
-    setTeams(prev => [...prev, newTeam]);
-    setSelectedTeamId(newTeam.id);
+    try {
+      const createdTeam = await teamService.createTeam(newTeamData, 1, currentSportConfig.id);
+      setTeams(prev => [...prev, createdTeam]);
+      setSelectedTeamId(createdTeam.id);
+      showToast(`Équipe "${newTeamName}" enregistrée avec succès en base de données !`);
+    } catch (err: any) {
+      console.error('Erreur lors de la création de l\'équipe en BD:', err);
+      showToast(`Erreur lors de la création: ${err?.message || 'Serveur indisponible'}`);
+      return;
+    }
+
     setIsCreateTeamModalOpen(false);
-    showToast(`Équipe "${newTeam.name}" créée avec succès !`);
     setNewTeamName('');
     setNewCoachName('');
   };
@@ -90,40 +98,46 @@ export const TeamsView: React.FC = () => {
 
       {/* Team Selection Cards Horizontal Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        {teams.map(team => {
-          const isSelected = team.id === selectedTeamId;
-          const memberCount = members.filter(m => m.teamId === team.id).length;
-          return (
-            <button
-              key={team.id}
-              type="button"
-              onClick={() => setSelectedTeamId(team.id)}
-              className={`p-4 rounded-2xl border text-left transition-all ${
-                isSelected
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className={`w-3 h-3 rounded-full ${isSelected ? 'bg-white' : ''}`}
-                  style={{ backgroundColor: isSelected ? '#ffffff' : team.colorHex }}
-                />
-                <span className={`text-xs font-bold ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                  #{team.ranking} au classement
-                </span>
-              </div>
-              <h3 className="font-bold text-sm mt-2 truncate">{team.name}</h3>
-              <p className={`text-xs mt-0.5 truncate ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
-                {team.division}
-              </p>
-              <div className={`mt-3 text-[11px] font-semibold flex items-center justify-between ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
-                <span>{memberCount} joueurs</span>
-                <span>{team.points} pts</span>
-              </div>
-            </button>
-          );
-        })}
+        {teams.length === 0 ? (
+          <div className="col-span-full p-8 bg-white rounded-2xl border border-slate-200 text-center text-slate-500 font-medium">
+            Aucune équipe enregistrée en base pour le moment. Cliquez sur "+ Ajouter une Équipe" pour créer votre première équipe !
+          </div>
+        ) : (
+          teams.map(team => {
+            const isSelected = team.id === selectedTeamId;
+            const memberCount = members.filter(m => m.teamId === team.id).length;
+            return (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => setSelectedTeamId(team.id)}
+                className={`p-4 rounded-2xl border text-left transition-all ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`w-3 h-3 rounded-full ${isSelected ? 'bg-white' : ''}`}
+                    style={{ backgroundColor: isSelected ? '#ffffff' : team.colorHex }}
+                  />
+                  <span className={`text-xs font-bold ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                    {team.category}
+                  </span>
+                </div>
+                <h3 className="font-bold text-sm mt-2 truncate">{team.name}</h3>
+                <p className={`text-xs mt-0.5 truncate ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                  {team.division}
+                </p>
+                <div className={`mt-3 text-[11px] font-semibold flex items-center justify-between ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
+                  <span>{memberCount} joueurs</span>
+                  <span>{team.points} pts</span>
+                </div>
+              </button>
+            );
+          })
+        )}
       </div>
 
       {/* Selected Team Detail View */}
@@ -261,57 +275,31 @@ export const TeamsView: React.FC = () => {
             </div>
           )}
 
-          {/* Tab 3: Division Standings & League Table */}
+          {/* Tab 3: Team Performance Stats */}
           {selectedTab === 'stats' && (
             <div className="p-6 space-y-4">
-              <h3 className="font-bold text-sm text-slate-800">Classement Provisoire — {selectedTeam.division}</h3>
+              <h3 className="font-bold text-sm text-slate-800">Bilan des Matchs — {selectedTeam.name}</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-slate-50 text-slate-500 font-bold text-[11px] uppercase">
                     <tr>
-                      <th className="py-2.5 px-3">Rang</th>
-                      <th className="py-2.5 px-3">Club</th>
-                      <th className="py-2.5 px-3 text-center">Joués</th>
-                      <th className="py-2.5 px-3 text-center">Gagnés</th>
-                      <th className="py-2.5 px-3 text-center">Perdus</th>
-                      <th className="py-2.5 px-3 text-right">Points</th>
+                      <th className="py-2.5 px-3">Équipe / Section</th>
+                      <th className="py-2.5 px-3 text-center">Matchs Joués</th>
+                      <th className="py-2.5 px-3 text-center">Victoires</th>
+                      <th className="py-2.5 px-3 text-center">Défaites</th>
+                      <th className="py-2.5 px-3 text-right">Points Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    <tr className="hover:bg-slate-50">
-                      <td className="py-2.5 px-3 font-bold text-slate-400">1</td>
-                      <td className="py-2.5 px-3">Grenoble Volley Université</td>
-                      <td className="py-2.5 px-3 text-center">14</td>
-                      <td className="py-2.5 px-3 text-center text-emerald-600">12</td>
-                      <td className="py-2.5 px-3 text-center text-rose-600">2</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">35</td>
-                    </tr>
                     <tr className="bg-blue-50/70 text-blue-900 font-bold">
-                      <td className="py-2.5 px-3 text-blue-600">2</td>
                       <td className="py-2.5 px-3 flex items-center gap-2">
                         <span>{selectedTeam.name}</span>
-                        <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-normal">Notre Club</span>
+                        <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-normal">Notre Équipe</span>
                       </td>
                       <td className="py-2.5 px-3 text-center">{selectedTeam.playedMatches}</td>
                       <td className="py-2.5 px-3 text-center text-emerald-600">{selectedTeam.wins}</td>
                       <td className="py-2.5 px-3 text-center text-rose-600">{selectedTeam.losses}</td>
                       <td className="py-2.5 px-3 text-right text-blue-700 font-bold">{selectedTeam.points}</td>
-                    </tr>
-                    <tr className="hover:bg-slate-50">
-                      <td className="py-2.5 px-3 font-bold text-slate-400">3</td>
-                      <td className="py-2.5 px-3">AS Cannes Volley</td>
-                      <td className="py-2.5 px-3 text-center">14</td>
-                      <td className="py-2.5 px-3 text-center text-emerald-600">10</td>
-                      <td className="py-2.5 px-3 text-center text-rose-600">4</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">29</td>
-                    </tr>
-                    <tr className="hover:bg-slate-50">
-                      <td className="py-2.5 px-3 font-bold text-slate-400">4</td>
-                      <td className="py-2.5 px-3">Nice Volley Ball</td>
-                      <td className="py-2.5 px-3 text-center">13</td>
-                      <td className="py-2.5 px-3 text-center text-emerald-600">8</td>
-                      <td className="py-2.5 px-3 text-center text-rose-600">5</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">24</td>
                     </tr>
                   </tbody>
                 </table>
