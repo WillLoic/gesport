@@ -37,6 +37,7 @@ import {
 } from '../types';
 import { memberService } from '../services/memberService';
 import { teamService } from '../services/teamService';
+import { competitionService } from '../services/competitionService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -215,10 +216,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Équipes synchronisées avec le microservice sport_perf/teams (initialement vide avant chargement DB)
   const [teams, setTeams] = useState<Team[]>([]);
 
-  const [events, setEvents] = useState<SportEvent[]>(() => {
-    const saved = localStorage.getItem('sportflow_events');
-    return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-  });
+  // Événements & Matchs synchronisés avec le microservice sport_perf/competitions
+  const [events, setEvents] = useState<SportEvent[]>([]);
 
   const [exercises, setExercises] = useState<TrainingExercise[]>(() => {
     const savedSport = (localStorage.getItem('sportflow_current_sport') as SportType) || 'volleyball';
@@ -390,6 +389,18 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       .catch((err) => {
         console.warn('Microservice sport_perf (teams) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des compétitions/matchs depuis le microservice backend (sport_perf / competitions)
+  useEffect(() => {
+    competitionService
+      .getMatches(1)
+      .then((remoteMatches) => {
+        setEvents(remoteMatches || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (competitions) non disponible:', err);
       });
   }, []);
 

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { SportEvent, EventType } from '../../types';
+import { competitionService } from '../../services/competitionService';
 
 export const CalendarView: React.FC = () => {
   const { events, setEvents, teams, members, vehicles, showToast } = useClub();
@@ -29,7 +30,7 @@ export const CalendarView: React.FC = () => {
   // New Event Form States
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventType, setNewEventType] = useState<EventType>('match_official');
-  const [newTeamId, setNewTeamId] = useState(teams[0]?.id || 't1');
+  const [newTeamId, setNewTeamId] = useState(teams[0]?.id || '1');
   const [newOpponent, setNewOpponent] = useState('');
   const [newIsHome, setNewIsHome] = useState(true);
   const [newEventDate, setNewEventDate] = useState(new Date().toISOString().split('T')[0]);
@@ -40,7 +41,7 @@ export const CalendarView: React.FC = () => {
   const [newHall, setNewHall] = useState('Terrain A');
   const [newNotes, setNewNotes] = useState('');
 
-  const handleCreateEvent = (e: React.FormEvent) => {
+  const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEventTitle.trim()) {
       showToast('Veuillez donner un titre à l\'événement.');
@@ -50,11 +51,10 @@ export const CalendarView: React.FC = () => {
     const assignedTeam = teams.find(t => t.id === newTeamId) || teams[0];
     const teamSquad = members.filter(m => m.teamId === assignedTeam?.id);
 
-    const newEv: SportEvent = {
-      id: `e-${Date.now()}`,
+    const newEvData: Partial<SportEvent> = {
       title: newEventTitle.trim(),
       type: newEventType,
-      teamId: assignedTeam ? assignedTeam.id : 't1',
+      teamId: assignedTeam ? assignedTeam.id : '1',
       teamName: assignedTeam ? assignedTeam.name : 'Équipe 1',
       opponent: newOpponent.trim() || (newEventType.startsWith('match') ? 'Adversaire' : undefined),
       isHome: newIsHome,
@@ -74,10 +74,18 @@ export const CalendarView: React.FC = () => {
       })),
     };
 
-    setEvents(prev => [newEv, ...prev]);
-    setSelectedEvent(newEv);
+    try {
+      const createdEvent = await competitionService.createMatch(newEvData, Number(assignedTeam?.id) || 1);
+      setEvents(prev => [createdEvent, ...prev]);
+      setSelectedEvent(createdEvent);
+      showToast(`Événement "${createdEvent.title}" enregistré avec succès en base de données !`);
+    } catch (err: any) {
+      console.error('Erreur lors de la création de la compétition en BD:', err);
+      showToast(`Erreur lors de l'enregistrement: ${err?.message || 'Serveur indisponible'}`);
+      return;
+    }
+
     setIsCreateEventModalOpen(false);
-    showToast(`Événement "${newEv.title}" ajouté au calendrier et convocations envoyées !`);
     setNewEventTitle('');
     setNewOpponent('');
     setNewNotes('');
