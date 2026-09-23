@@ -112,12 +112,7 @@ class TrainingSessionListCreateView(APIView):
     def post(self, request: Request) -> Response:
         serializer = TrainingSessionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data.copy()
-        team = data.pop('team', None)
-        if team is not None:
-            session = create_training_session(team=team, **data)
-        else:
-            session = create_training_session(**data)
+        session = create_training_session(**serializer.validated_data)
         return Response(TrainingSessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
 class TrainingSessionDetailView(APIView):
