@@ -20,11 +20,11 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
     team_id = serializers.IntegerField(write_only=True)  # ← pour l'écriture
     team_name = serializers.CharField(source='team.name', read_only=True)
     exercises_detail = TrainingExerciseSerializer(source='exercises', many=True, read_only=True)
-    team = serializers.PrimaryKeyRelatedField(
+    """team = serializers.PrimaryKeyRelatedField(
         queryset=Team.objects.all(),
         required=False,
         allow_null=True
-    )
+    )"""
     exercises = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=TrainingExercise.objects.all(),
@@ -42,5 +42,6 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'created_at': {'read_only': True},
         }
+
 
 
