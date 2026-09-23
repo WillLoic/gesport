@@ -101,9 +101,11 @@ export function mapFrontendSessionToBackend(session: Partial<TrainingSession>, t
   const dateStr = session.date || new Date().toISOString().split('T')[0];
   const timeStr = session.startTime || '19:00';
   const sessionDateTime = `${dateStr}T${timeStr}:00Z`;
+  const resolvedTeamId = Number(session.teamId) || Number(teamId) || 1;
 
   return {
-    team: Number(session.teamId) || teamId,
+    team: resolvedTeamId,
+    team_id: resolvedTeamId,
     title: session.title || 'Séance d\'entraînement',
     session_date: sessionDateTime,
     start_time: session.startTime || '19:00',
