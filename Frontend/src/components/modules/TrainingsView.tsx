@@ -51,7 +51,8 @@ export const TrainingsView: React.FC = () => {
   useEffect(() => {
     if (exercises.length > 0) {
       setSelectedExercise(exercises[0]);
-      setSelectedCategoryFilter('all');
+    } else {
+      setSelectedExercise(null);
     }
   }, [currentSport, exercises]);
 
@@ -270,87 +271,107 @@ export const TrainingsView: React.FC = () => {
       {/* Tab 1: Planned Sessions */}
       {activeTab === 'sessions' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {trainings.map(session => (
-              <div
-                key={session.id}
-                className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 transition-all space-y-4 relative group"
+          {trainings.length === 0 ? (
+            <div className="p-12 text-center bg-white border border-slate-200 rounded-2xl space-y-3">
+              <Dumbbell className="w-10 h-10 text-slate-300 mx-auto" />
+              <h3 className="font-bold text-slate-800 text-base">Aucune séance d'entraînement enregistrée</h3>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Aucune séance n'est enregistrée en base de données pour le moment.
+              </p>
+              <button
+                type="button"
+                onClick={openCreateSessionModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      {session.teamName}
-                    </span>
-                    <h3 className="font-bold text-base text-slate-900 mt-2">{session.title}</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Entraîneur : <span className="font-semibold text-slate-700">{session.coachName}</span>
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-slate-900">{session.date}</span>
-                      <p className="text-xs text-slate-400">{session.startTime} - {session.endTime}</p>
+                <Plus className="w-4 h-4" />
+                Planifier la première séance
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {trainings.map(session => (
+                <div
+                  key={session.id}
+                  className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 transition-all space-y-4 relative group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        {session.teamName}
+                      </span>
+                      <h3 className="font-bold text-base text-slate-900 mt-2">{session.title}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Entraîneur : <span className="font-semibold text-slate-700">{session.coachName}</span>
+                      </p>
                     </div>
-
-                    {/* Quick Edit & Delete Buttons */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={(e) => openEditSessionModal(session, e)}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                        title="Modifier la séance"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteSession(session.id, e)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        title="Supprimer la séance"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5">
-                  <p className="font-bold text-slate-800">Thème principal de la séance :</p>
-                  <p className="text-slate-600">{session.theme}</p>
-                </div>
-
-                {/* Exercises flow list */}
-                <div>
-                  <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">
-                    Déroulé de la séance ({session.exercises.length} blocs)
-                  </h4>
-                  <div className="space-y-1.5">
-                    {session.exercises.map((ex, idx) => (
-                      <div
-                        key={ex.id || idx}
-                        className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center">
-                            {idx + 1}
-                          </span>
-                          <span className="font-medium text-slate-900">{ex.title}</span>
-                        </div>
-                        <span className="text-slate-500 font-semibold">{ex.durationMinutes} min</span>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-slate-900">{session.date}</span>
+                        <p className="text-xs text-slate-400">{session.startTime} - {session.endTime}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
-                {session.coachFeedback && (
-                  <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-900">
-                    <span className="font-bold">Débrief Coach : </span>
-                    {session.coachFeedback}
+                      {/* Quick Edit & Delete Buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => openEditSessionModal(session, e)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Modifier la séance"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSession(session.id, e)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Supprimer la séance"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5">
+                    <p className="font-bold text-slate-800">Thème principal de la séance :</p>
+                    <p className="text-slate-600">{session.theme}</p>
+                  </div>
+
+                  {/* Exercises flow list */}
+                  {session.exercises && session.exercises.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">
+                        Déroulé de la séance ({session.exercises.length} blocs)
+                      </h4>
+                      <div className="space-y-1.5">
+                        {session.exercises.map((ex, idx) => (
+                          <div
+                            key={ex.id || idx}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center">
+                                {idx + 1}
+                              </span>
+                              <span className="font-medium text-slate-900">{ex.title}</span>
+                            </div>
+                            <span className="text-slate-500 font-semibold">{ex.durationMinutes} min</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {session.coachFeedback && (
+                    <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-900">
+                      <span className="font-bold">Débrief Coach : </span>
+                      {session.coachFeedback}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -382,51 +403,57 @@ export const TrainingsView: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-2">
-              {filteredExercises.map(ex => {
-                const isSelected = selectedExercise?.id === ex.id;
-                return (
-                  <div
-                    key={ex.id}
-                    onClick={() => setSelectedExercise(ex)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer relative group ${
-                      isSelected
-                        ? 'bg-blue-50 border-blue-500 shadow-sm'
-                        : 'bg-white border-slate-200 hover:border-blue-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="font-bold text-blue-600">{ex.category}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400 font-semibold">{ex.durationMinutes} min</span>
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteExercise(ex.id, e)}
-                          className="text-slate-300 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
-                          title="Supprimer l'exercice"
+            {filteredExercises.length === 0 ? (
+              <div className="p-6 text-center bg-white border border-slate-200 rounded-xl text-xs text-slate-400">
+                Aucun exercice enregistré dans la bibliothèque.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredExercises.map(ex => {
+                  const isSelected = selectedExercise?.id === ex.id;
+                  return (
+                    <div
+                      key={ex.id}
+                      onClick={() => setSelectedExercise(ex)}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer relative group ${
+                        isSelected
+                          ? 'bg-blue-50 border-blue-500 shadow-sm'
+                          : 'bg-white border-slate-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-bold text-blue-600">{ex.category}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 font-semibold">{ex.durationMinutes} min</span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteExercise(ex.id, e)}
+                            className="text-slate-300 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
+                            title="Supprimer l'exercice"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-sm text-slate-900">{ex.title}</h3>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            ex.intensity === 'Élevée'
+                              ? 'bg-rose-100 text-rose-800'
+                              : ex.intensity === 'Moyenne'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                          Intensité : {ex.intensity}
+                        </span>
                       </div>
                     </div>
-                    <h3 className="font-bold text-sm text-slate-900">{ex.title}</h3>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          ex.intensity === 'Élevée'
-                            ? 'bg-rose-100 text-rose-800'
-                            : ex.intensity === 'Moyenne'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        Intensité : {ex.intensity}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Drill Diagram & Detailed Instructions (Right) */}
@@ -473,7 +500,7 @@ export const TrainingsView: React.FC = () => {
               </div>
             ) : (
               <div className="p-8 bg-white rounded-2xl border border-slate-200 text-center text-slate-400">
-                Sélectionnez un exercice pour consulter sa fiche détaillée.
+                Sélectionnez un exercice pour consulter sa fiche détaillée ou ajoutez-en un nouveau.
               </div>
             )}
           </div>

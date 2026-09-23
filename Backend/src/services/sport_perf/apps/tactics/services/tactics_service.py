@@ -1,7 +1,7 @@
 from apps.tactics.models.tactics import TacticalBoard, TrainingExercise, TrainingSession
 from apps.teams.models.team import Team
 
-def create_tactical_board(*, club_id: int = 1, title: str, system_name: str = '4-3-3', **kwargs) -> TacticalBoard:
+def create_tactical_board(*, club_id: int = 1, title: str = "Schéma Tactique", system_name: str = "4-3-3", **kwargs) -> TacticalBoard:
     return TacticalBoard.objects.create(club_id=club_id, title=title, system_name=system_name, **kwargs)
 
 def update_tactical_board(board_id: int, **kwargs) -> TacticalBoard:
@@ -17,7 +17,7 @@ def delete_tactical_board(board_id: int) -> bool:
     board.delete()
     return True
 
-def create_training_exercise(*, club_id: int = 1, title: str, **kwargs) -> TrainingExercise:
+def create_training_exercise(*, club_id: int = 1, title: str = "Exercice", **kwargs) -> TrainingExercise:
     return TrainingExercise.objects.create(club_id=club_id, title=title, **kwargs)
 
 def update_training_exercise(exercise_id: int, **kwargs) -> TrainingExercise:
@@ -33,8 +33,12 @@ def delete_training_exercise(exercise_id: int) -> bool:
     ex.delete()
     return True
 
-def create_training_session(*, team: Team = None, team_id: int = None, title: str, session_date, **kwargs) -> TrainingSession:
+def create_training_session(*, team: Team = None, team_id: int = None, title: str = "Séance d'entraînement", session_date = None, **kwargs) -> TrainingSession:
     exercises = kwargs.pop('exercises', [])
+    if session_date is None:
+        from django.utils import timezone
+        session_date = timezone.now()
+
     if team is not None:
         ts = TrainingSession.objects.create(team=team, title=title, session_date=session_date, **kwargs)
     elif team_id is not None:
