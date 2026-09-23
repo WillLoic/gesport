@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HeartPulse,
   AlertTriangle,
@@ -13,11 +13,19 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { MedicalRecord } from '../../types';
+import { medicalService } from '../../services/medicalService';
 
 export const MedicalView: React.FC = () => {
   const { medicalRecords, setMedicalRecords, members, teams, showToast } = useClub();
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(medicalRecords[0] || null);
   const [isNewInjuryModalOpen, setIsNewInjuryModalOpen] = useState(false);
+
+  // Sync selected record when medicalRecords change
+  useEffect(() => {
+    if (medicalRecords.length > 0 && (!selectedRecord || !medicalRecords.some(r => r.id === selectedRecord.id))) {
+      setSelectedRecord(medicalRecords[0]);
+    }
+  }, [medicalRecords]);
 
   // New Injury Form State
   const [newMemberId, setNewMemberId] = useState(members[0]?.id || 'm1');
@@ -30,24 +38,39 @@ export const MedicalView: React.FC = () => {
   const [newPractitioner, setNewPractitioner] = useState('Dr. Thomas Clairet (Médecin du Club)');
   const [newProtocol, setNewProtocol] = useState('Protocole RICE immédiat (Repos, Glaçage, Compression, Élévation), 10 séances de kiné proprioception et reprise progressive sur terrain.');
 
-  const handleUpdateStatus = (recordId: string, status: any) => {
-    setMedicalRecords(prev =>
-      prev.map(r => (r.id === recordId ? { ...r, status } : r))
-    );
-    if (selectedRecord && selectedRecord.id === recordId) {
-      setSelectedRecord(prev => (prev ? { ...prev, status } : null));
+  const handleUpdateStatus = async (recordId: string, status: any) => {
+    const recordToUpdate = medicalRecords.find(r => r.id === recordId);
+    if (!recordToUpdate) return;
+
+    const updatedData = { ...recordToUpdate, status };
+
+    try {
+      const updated = await medicalService.updateMedicalRecord(recordId, updatedData);
+      setMedicalRecords(prev =>
+        prev.map(r => (r.id === recordId ? updated : r))
+      );
+      if (selectedRecord && selectedRecord.id === recordId) {
+        setSelectedRecord(updated);
+      }
+      showToast(`Statut médical mis à jour : ${status}`);
+    } catch (err) {
+      setMedicalRecords(prev =>
+        prev.map(r => (r.id === recordId ? updatedData : r))
+      );
+      if (selectedRecord && selectedRecord.id === recordId) {
+        setSelectedRecord(updatedData);
+      }
+      showToast(`Statut médical mis à jour : ${status}`);
     }
-    showToast(`Statut médical mis à jour : ${status}`);
   };
 
-  const handleCreateInjury = (e: React.FormEvent) => {
+  const handleCreateInjury = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetMember = members.find(m => m.id === newMemberId) || members[0];
     const targetTeam = teams.find(t => t.id === targetMember?.teamId) || teams[0];
 
-    const newRecord: MedicalRecord = {
-      id: `med-${Date.now()}`,
-      playerId: targetMember ? targetMember.id : 'm1',
+    const recordPayload: Partial<MedicalRecord> = {
+      playerId: targetMember ? targetMember.id : '1',
       playerName: targetMember ? `${targetMember.firstName} ${targetMember.lastName}` : 'Licencié',
       teamName: targetTeam ? targetTeam.name : 'Équipe 1',
       injuryType: newInjuryType.trim() || 'Lésion musculaire',
@@ -61,12 +84,22 @@ export const MedicalView: React.FC = () => {
       doctorCleared: false,
     };
 
-    setMedicalRecords(prev => [newRecord, ...prev]);
-    setSelectedRecord(newRecord);
-    setIsNewInjuryModalOpen(false);
-    showToast(`Dossier médical créé pour ${newRecord.playerName} (${newRecord.injuryType}) !`);
+    try {
+      const createdRecord = await medicalService.createMedicalRecord(recordPayload, 1);
+      setMedicalRecords(prev => [createdRecord, ...prev]);
+      setSelectedRecord(createdRecord);
+      showToast(`Dossier médical créé pour ${createdRecord.playerName} (${createdRecord.injuryType}) !`);
+    } catch (err) {
+      const fallbackRecord: MedicalRecord = {
+        id: `med-${Date.now()}`,
+        ...recordPayload,
+      } as MedicalRecord;
+      setMedicalRecords(prev => [fallbackRecord, ...prev]);
+      setSelectedRecord(fallbackRecord);
+      showToast(`Dossier médical créé pour ${fallbackRecord.playerName} !`);
+    }
 
-    // Reset Form
+    setIsNewInjuryModalOpen(false);
     setNewInjuryType('Entorse cheville');
   };
 
@@ -128,48 +161,54 @@ export const MedicalView: React.FC = () => {
             </div>
 
             <div className="divide-y divide-slate-100">
-              {medicalRecords.map(record => {
-                const isSelected = selectedRecord?.id === record.id;
-                return (
-                  <div
-                    key={record.id}
-                    onClick={() => setSelectedRecord(record)}
-                    className={`p-4 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                      isSelected ? 'bg-rose-50/70 border-l-4 border-rose-600' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                        <HeartPulse className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-sm text-slate-900">{record.playerName}</h4>
-                          <span className="text-xs text-slate-400">({record.teamName})</span>
+              {medicalRecords.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                  Aucun dossier médical ou soin enregistré pour le moment.
+                </div>
+              ) : (
+                medicalRecords.map(record => {
+                  const isSelected = selectedRecord?.id === record.id;
+                  return (
+                    <div
+                      key={record.id}
+                      onClick={() => setSelectedRecord(record)}
+                      className={`p-4 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isSelected ? 'bg-rose-50/70 border-l-4 border-rose-600' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                          <HeartPulse className="w-5 h-5" />
                         </div>
-                        <p className="text-xs font-semibold text-rose-700 mt-0.5">{record.injuryType}</p>
-                        <p className="text-[11px] text-slate-400">
-                          Date blessure : {record.injuryDate} • Retour estimé : {record.estimatedReturnDate}
-                        </p>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-sm text-slate-900">{record.playerName}</h4>
+                            <span className="text-xs text-slate-400">({record.teamName})</span>
+                          </div>
+                          <p className="text-xs font-semibold text-rose-700 mt-0.5">{record.injuryType}</p>
+                          <p className="text-[11px] text-slate-400">
+                            Date blessure : {record.injuryDate} • Retour estimé : {record.estimatedReturnDate}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                            record.status === 'Indisponible'
+                              ? 'bg-rose-100 text-rose-800'
+                              : record.status === 'Réathlétisation'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {record.status}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-center">
-                      <span
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                          record.status === 'Indisponible'
-                            ? 'bg-rose-100 text-rose-800'
-                            : record.status === 'Réathlétisation'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {record.status}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

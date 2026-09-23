@@ -39,6 +39,7 @@ import { memberService } from '../services/memberService';
 import { teamService } from '../services/teamService';
 import { competitionService } from '../services/competitionService';
 import { tacticsService } from '../services/tacticsService';
+import { medicalService } from '../services/medicalService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -234,10 +235,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : INITIAL_MATCH_STATS;
   });
 
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
-    const saved = localStorage.getItem('sportflow_medical');
-    return saved ? JSON.parse(saved) : INITIAL_MEDICAL_RECORDS;
-  });
+  // Dossiers médicaux synchronisés uniquement avec le microservice backend (sport_perf / medical)
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
 
   const [inventory, setInventory] = useState<InventoryItem[]>(() => {
     const saved = localStorage.getItem('sportflow_inventory');
@@ -419,6 +418,19 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((err) => {
         console.warn('Microservice sport_perf (tactics/sessions) non disponible:', err);
         setTrainings([]);
+      });
+  }, []);
+
+  // Chargement initial des dossiers médicaux depuis le microservice backend (sport_perf / medical)
+  useEffect(() => {
+    medicalService
+      .getMedicalRecords(1)
+      .then((remoteRecords) => {
+        setMedicalRecords(remoteRecords || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (medical) non disponible:', err);
+        setMedicalRecords([]);
       });
   }, []);
 
