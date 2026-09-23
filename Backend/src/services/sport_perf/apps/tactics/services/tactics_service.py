@@ -45,28 +45,52 @@ def delete_training_exercise(exercise_id: int) -> bool:
 
 def create_training_session(team: Team = None, team_id: int = None, title: str = "Séance d'entraînement", session_date = None, **kwargs) -> TrainingSession:
     exercises = kwargs.pop('exercises', [])
-    if team is None and 'team' in kwargs:
-        team = kwargs.pop('team')
-    if team_id is None and 'team_id' in kwargs:
-        team_id = kwargs.pop('team_id')
+    # Nettoyer les kwargs pour éviter les conflits
+    kwargs.pop('team', None)
+    kwargs.pop('team_id', None)
 
     if session_date is None:
         from django.utils import timezone
         session_date = timezone.now()
 
-    if team is not None:
-        ts = TrainingSession.objects.create(team=team, title=title, session_date=session_date, **kwargs)
-    elif team_id is not None:
-        ts = TrainingSession.objects.create(team_id=team_id, title=title, session_date=session_date, **kwargs)
-    else:
-        first_team = Team.objects.first()
-        if first_team:
-            ts = TrainingSession.objects.create(team=first_team, title=title, session_date=session_date, **kwargs)
-        else:
-            ts = TrainingSession.objects.create(team_id=1, title=title, session_date=session_date, **kwargs)
+    # Résoudre l'équipe
+    resolved_team = team
+    if resolved_team is None and team_id is not None:
+        try:
+            resolved_team = Team.objects.get(pk=team_id)
+        except Team.DoesNotExist:
+            resolved_team = None
+
+    if resolved_team is None:
+        resolved_team = Team.objects.first()
+
+    if resolved_team is None:
+        # Créer une équipe par défaut si aucune n'existe
+        resolved_team = Team.objects.create(
+            club_id=1,
+            name="Équipe Principale",
+            sport_type="football",
+            category="Senior"
+        )
+
+    ts = TrainingSession.objects.create(
+        team=resolved_team,
+        title=title,
+        session_date=session_date,
+        **kwargs
+    )
 
     if exercises:
-        ts.exercises.set(exercises)
+        # Filtrer les exercices valides (peuvent être des objets ou des IDs)
+        valid_exercise_ids = []
+        for ex in exercises:
+            if isinstance(ex, TrainingExercise):
+                valid_exercise_ids.append(ex.pk)
+            elif isinstance(ex, int):
+                if TrainingExercise.objects.filter(pk=ex).exists():
+                    valid_exercise_ids.append(ex)
+        if valid_exercise_ids:
+            ts.exercises.set(valid_exercise_ids)
     return ts
 
 def update_training_session(session_id: int, **kwargs) -> TrainingSession:
