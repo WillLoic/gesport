@@ -204,6 +204,10 @@ export const MembersView: React.FC = () => {
       prev.map(m => (m.id === memberId ? updatedMember : m))
     );
 
+    if (selectedMember?.id === memberId) {
+      setSelectedMember(updatedMember);
+    }
+
     if (!memberId.startsWith('m-')) {
       try {
         await memberService.updateMember(memberId, updatedMember, 1, currentSportConfig.id);
@@ -505,10 +509,22 @@ export const MembersView: React.FC = () => {
               {/* Status Badges Row */}
               <div className="flex flex-wrap gap-2">
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                  {selectedMember.teamName}
+                  {selectedMember.teamName || 'Sans équipe'}
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                  {selectedMember.category}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
                   Poste : {selectedMember.position}
+                </span>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  selectedMember.licenseStatus === 'Validée'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : selectedMember.licenseStatus === 'En attente'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-rose-100 text-rose-800'
+                }`}>
+                  Licence : {selectedMember.licenseStatus}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Saison {selectedMember.season}
@@ -517,19 +533,27 @@ export const MembersView: React.FC = () => {
 
               {/* Personal & Contact Details */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Coordonnées</h3>
+                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Informations Personnelles & Coordonnées</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span>Genre : <strong className="text-slate-900">{selectedMember.gender === 'M' ? 'Masculin' : 'Féminin'}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <span>Né(e) le : <strong className="text-slate-900">{selectedMember.birthDate}</strong></span>
+                  </div>
                   <div className="flex items-center gap-2 text-slate-700">
                     <Mail className="w-4 h-4 text-slate-400" />
                     <span>{selectedMember.email}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-700">
                     <Phone className="w-4 h-4 text-slate-400" />
-                    <span>{selectedMember.phone}</span>
+                    <span>{selectedMember.phone || 'Non renseigné'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-700 col-span-full">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    <span>Né(e) le : {selectedMember.birthDate}</span>
+                    <Shield className="w-4 h-4 text-slate-400" />
+                    <span>N° Licence : <strong className="font-mono text-slate-900">{selectedMember.licenseNumber}</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-700 col-span-full">
                     <span className="font-semibold text-slate-500">Adresse :</span>
@@ -579,23 +603,17 @@ export const MembersView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Salaries if present */}
-              {(selectedMember.grossMonthlySalary != null || selectedMember.dailySalary != null) && (
-                <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-2">
-                  <h3 className="text-xs font-bold uppercase text-emerald-800 tracking-wider flex items-center gap-1.5">
-                    <CreditCard className="w-4 h-4 text-emerald-600" />
-                    Rémunération & Primes
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-800 font-medium">
-                    {selectedMember.grossMonthlySalary != null && (
-                      <p>Salaire brut mensuel : <span className="font-bold">{selectedMember.grossMonthlySalary} €</span></p>
-                    )}
-                    {selectedMember.dailySalary != null && (
-                      <p>Prime journalière : <span className="font-bold">{selectedMember.dailySalary} €/jour</span></p>
-                    )}
-                  </div>
+              {/* Salaries & Primes */}
+              <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-2">
+                <h3 className="text-xs font-bold uppercase text-emerald-800 tracking-wider flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-emerald-600" />
+                  Rémunération & Primes Joueur
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-800 font-medium">
+                  <p>Salaire brut mensuel : <span className="font-bold">{selectedMember.grossMonthlySalary != null ? `${selectedMember.grossMonthlySalary} €` : 'Non défini'}</span></p>
+                  <p>Prime d'entraînement journalière : <span className="font-bold">{selectedMember.dailySalary != null ? `${selectedMember.dailySalary} €/jour` : 'Non définie'}</span></p>
                 </div>
-              )}
+              </div>
 
               {selectedMember.notes && (
                 <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
@@ -606,21 +624,30 @@ export const MembersView: React.FC = () => {
             </div>
 
             {/* Drawer Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
               <button
                 type="button"
-                onClick={() => openEditModal(selectedMember)}
-                className="px-4 py-2 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-xl"
+                onClick={() => handleToggleLicenseValidation(selectedMember.id)}
+                className="px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
-                Modifier le licencié
+                Basculer Statut Licence ({selectedMember.licenseStatus})
               </button>
-              <button
-                type="button"
-                onClick={() => setSelectedMember(null)}
-                className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl"
-              >
-                Fermer
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openEditModal(selectedMember)}
+                  className="px-3.5 py-2 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Modifier le licencié
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMember(null)}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer"
+                >
+                  Fermer
+                </button>
+              </div>
             </div>
           </div>
         </div>
