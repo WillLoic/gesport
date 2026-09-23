@@ -129,6 +129,27 @@ export const competitionService = {
   },
 
   /**
+   * Modifie un match existant dans la BD backend
+   */
+  async updateMatch(matchId: number | string, event: Partial<SportEvent>): Promise<SportEvent> {
+    const payload = mapFrontendMatchToBackend(event, Number(event.teamId) || 1);
+    const data = await apiFetch<BackendMatchEvent>(`/sport/competitions/${matchId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return mapBackendMatchToFrontend(data);
+  },
+
+  /**
+   * Supprime un match dans la BD backend
+   */
+  async deleteMatch(matchId: number | string): Promise<void> {
+    await apiFetch(`/sport/competitions/${matchId}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
    * Ajoute une convocation de joueur pour un match
    */
   async addCallup(matchId: number | string, memberId: number | string, status = 'Convoqué', notes = ''): Promise<void> {

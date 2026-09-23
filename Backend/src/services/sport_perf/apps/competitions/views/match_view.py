@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from apps.competitions.selectors.match_selector import list_team_matches, get_match_by_id
 from apps.competitions.serializers.match_serializer import MatchEventSerializer, CallupSerializer, MatchPlayerStatsSerializer
-from apps.competitions.services.match_service import create_match, add_callup, update_match_stats
+from apps.competitions.services.match_service import create_match, update_match, delete_match, add_callup, update_match_stats
 
 class MatchListCreateView(APIView):
     permission_classes = [AllowAny]
@@ -33,6 +33,26 @@ class MatchDetailView(APIView):
         except Exception:
             return Response({"detail": "Match introuvable."}, status=status.HTTP_404_NOT_FOUND)
         return Response(MatchEventSerializer(match).data)
+
+    def put(self, request: Request, pk: int) -> Response:
+        try:
+            match = get_match_by_id(pk)
+        except Exception:
+            return Response({"detail": "Match introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = MatchEventSerializer(match, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(MatchEventSerializer(match).data)
+
+    def patch(self, request: Request, pk: int) -> Response:
+        return self.put(request, pk)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        try:
+            delete_match(pk)
+            return Response({"detail": "Match supprimé avec succès."}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({"detail": "Match introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
 class MatchCallupView(APIView):
     permission_classes = [AllowAny]

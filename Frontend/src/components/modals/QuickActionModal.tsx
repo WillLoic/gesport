@@ -306,7 +306,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({ isOpen, onCl
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Maxime"
+                    placeholder="Ex: Loic"
                     value={memberForm.firstName}
                     onChange={e => setMemberForm({ ...memberForm, firstName: e.target.value })}
                     className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:border-blue-600 outline-hidden"
@@ -317,7 +317,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({ isOpen, onCl
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Dupuis"
+                    placeholder="Ex: Will"
                     value={memberForm.lastName}
                     onChange={e => setMemberForm({ ...memberForm, lastName: e.target.value })}
                     className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:border-blue-600 outline-hidden"
