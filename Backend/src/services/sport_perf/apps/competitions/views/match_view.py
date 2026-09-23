@@ -19,7 +19,9 @@ class MatchListCreateView(APIView):
     def post(self, request: Request) -> Response:
         serializer = MatchEventSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        match = create_match(**serializer.validated_data)
+        data = serializer.validated_data.copy()
+        team = data.pop('team')
+        match = create_match(team=team, **data)
         return Response(MatchEventSerializer(match).data, status=status.HTTP_201_CREATED)
 
 class MatchDetailView(APIView):
