@@ -87,6 +87,27 @@ export const teamService = {
   },
 
   /**
+   * Met à jour une équipe existante dans le backend
+   */
+  async updateTeam(teamId: number | string, team: Partial<Team>, clubId = 1, sportType = 'football'): Promise<Team> {
+    const payload = mapFrontendTeamToBackend(team, clubId, sportType);
+    const data = await apiFetch<BackendTeam>(`/sport/teams/${teamId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return mapBackendTeamToFrontend(data);
+  },
+
+  /**
+   * Supprime une équipe
+   */
+  async deleteTeam(teamId: number | string): Promise<void> {
+    await apiFetch(`/sport/teams/${teamId}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
    * Ajoute un joueur (membre) à une équipe
    */
   async addPlayerToTeam(

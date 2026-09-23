@@ -11,6 +11,11 @@ import {
   ChevronRight,
   Sparkles,
   X,
+  Edit,
+  Trash2,
+  UserPlus,
+  Search,
+  Check,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { Team, Member, SportCategory } from '../../types';
@@ -18,12 +23,17 @@ import { teamService } from '../../services/teamService';
 import { SportTacticalPitch } from '../common/SportTacticalPitch';
 
 export const TeamsView: React.FC = () => {
-  const { teams, setTeams, members, currentSport, currentSportConfig, showToast } = useClub();
+  const { teams, setTeams, members, setMembers, currentSport, currentSportConfig, showToast } = useClub();
   const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id || '');
   const [selectedTab, setSelectedTab] = useState<'roster' | 'lineup' | 'stats'>('roster');
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
 
-  // New Team Form States
+  // Player Assignment Modal
+  const [isAssignPlayerModalOpen, setIsAssignPlayerModalOpen] = useState(false);
+  const [assignSearchTerm, setAssignSearchTerm] = useState('');
+
+  // Team Form States
   const [newTeamName, setNewTeamName] = useState('');
   const [newCategory, setNewCategory] = useState<SportCategory>('Senior Régionale');
   const [newDivision, setNewDivision] = useState('Régionale 1');
@@ -35,44 +45,108 @@ export const TeamsView: React.FC = () => {
   const selectedTeam = teams.find(t => t.id === selectedTeamId) || teams[0];
   const teamMembers = members.filter(m => m.teamId === selectedTeam?.id);
 
-  const handleCreateTeam = async (e: React.FormEvent) => {
+  const openCreateTeamModal = () => {
+    setEditingTeam(null);
+    setNewTeamName('');
+    setNewCategory('Senior Régionale');
+    setNewDivision('Régionale 1');
+    setNewCoachName('');
+    setNewTrainingDays('Mardi & Jeudi 20h-22h');
+    setNewHallName('Gymnase Municipal');
+    setNewColorHex('#2563eb');
+    setIsCreateTeamModalOpen(true);
+  };
+
+  const openEditTeamModal = (team: Team) => {
+    setEditingTeam(team);
+    setNewTeamName(team.name);
+    setNewCategory(team.category);
+    setNewDivision(team.division);
+    setNewCoachName(team.coachName);
+    setNewTrainingDays(team.trainingDays);
+    setNewHallName(team.hallName);
+    setNewColorHex(team.colorHex);
+    setIsCreateTeamModalOpen(true);
+  };
+
+  const handleSaveTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) {
       showToast('Veuillez renseigner le nom de l\'équipe.');
       return;
     }
 
-    const newTeamData: Partial<Team> = {
+    const teamData: Partial<Team> = {
       name: newTeamName.trim(),
       category: newCategory,
       division: newDivision.trim() || 'Championnat Régional',
       coachId: 's1',
       coachName: newCoachName.trim() || 'Staff Technique Club',
-      playerIds: [],
       trainingDays: newTrainingDays,
       hallName: newHallName,
       colorHex: newColorHex,
-      playedMatches: 0,
-      wins: 0,
-      losses: 0,
-      points: 0,
-      ranking: teams.length + 1,
     };
 
     try {
-      const createdTeam = await teamService.createTeam(newTeamData, 1, currentSportConfig.id);
-      setTeams(prev => [...prev, createdTeam]);
-      setSelectedTeamId(createdTeam.id);
-      showToast(`Équipe "${newTeamName}" enregistrée avec succès en base de données !`);
+      if (editingTeam) {
+        const updatedTeam = await teamService.updateTeam(editingTeam.id, teamData, 1, currentSportConfig.id);
+        setTeams(prev => prev.map(t => t.id === editingTeam.id ? updatedTeam : t));
+        showToast(`Équipe "${newTeamName}" mise à jour avec succès !`);
+      } else {
+        const createdTeam = await teamService.createTeam({ ...teamData, playerIds: [], playedMatches: 0, wins: 0, losses: 0, points: 0, ranking: teams.length + 1 }, 1, currentSportConfig.id);
+        setTeams(prev => [...prev, createdTeam]);
+        setSelectedTeamId(createdTeam.id);
+        showToast(`Équipe "${newTeamName}" enregistrée avec succès en base de données !`);
+      }
     } catch (err: any) {
-      console.error('Erreur lors de la création de l\'équipe en BD:', err);
-      showToast(`Erreur lors de la création: ${err?.message || 'Serveur indisponible'}`);
+      console.error('Erreur lors de la sauvegarde de l\'équipe en BD:', err);
+      showToast(`Erreur: ${err?.message || 'Serveur indisponible'}`);
       return;
     }
 
     setIsCreateTeamModalOpen(false);
-    setNewTeamName('');
-    setNewCoachName('');
+    setEditingTeam(null);
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette équipe ?')) {
+      try {
+        await teamService.deleteTeam(teamId);
+        setTeams(prev => prev.filter(t => t.id !== teamId));
+        if (selectedTeamId === teamId) {
+          const remaining = teams.filter(t => t.id !== teamId);
+          setSelectedTeamId(remaining[0]?.id || '');
+        }
+        showToast('Équipe supprimée avec succès.');
+      } catch (err: any) {
+        console.error('Erreur lors de la suppression de l\'équipe:', err);
+        showToast(`Erreur: ${err?.message || 'Impossible de supprimer l\'équipe'}`);
+      }
+    }
+  };
+
+  const handleTogglePlayerAssignment = async (member: Member) => {
+    if (!selectedTeam) return;
+    const isCurrentlyInTeam = member.teamId === selectedTeam.id;
+
+    try {
+      if (isCurrentlyInTeam) {
+        await teamService.removePlayerFromTeam(selectedTeam.id, member.id);
+        setMembers(prev =>
+          prev.map(m => (m.id === member.id ? { ...m, teamId: '', teamName: 'Sans équipe' } : m))
+        );
+        showToast(`${member.firstName} ${member.lastName} retiré(e) de l'équipe.`);
+      } else {
+        await teamService.addPlayerToTeam(selectedTeam.id, member.id, member.jerseyNumber, member.position);
+        setMembers(prev =>
+          prev.map(m => (m.id === member.id ? { ...m, teamId: selectedTeam.id, teamName: selectedTeam.name } : m))
+        );
+        showToast(`${member.firstName} ${member.lastName} affecté(e) à ${selectedTeam.name}.`);
+      }
+    } catch (err: any) {
+      console.error('Erreur lors de l\'affectation du joueur:', err);
+      showToast(`Erreur: ${err?.message || 'Impossible d\'effectuer l\'affectation'}`);
+    }
   };
 
   return (
@@ -88,7 +162,7 @@ export const TeamsView: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setIsCreateTeamModalOpen(true)}
+          onClick={openCreateTeamModal}
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -153,11 +227,31 @@ export const TeamsView: React.FC = () => {
                 {selectedTeam.name.substring(0, 2).toUpperCase()}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <h2 className="text-xl font-bold font-display">{selectedTeam.name}</h2>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white">
                     {selectedTeam.category}
                   </span>
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditTeamModal(selectedTeam)}
+                      className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                      title="Modifier l'équipe"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Modifier</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTeam(selectedTeam.id)}
+                      className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-200 hover:text-white rounded-lg text-xs flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                      title="Supprimer l'équipe"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Supprimer</span>
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-300 mt-1">
                   Coach Principal : <span className="font-semibold text-white">{selectedTeam.coachName}</span> • Gymnase : {selectedTeam.hallName}
@@ -226,38 +320,56 @@ export const TeamsView: React.FC = () => {
 
           {/* Tab 1: Roster List */}
           {selectedTab === 'roster' && (
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {teamMembers.map(member => (
-                  <div
-                    key={member.id}
-                    className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-xs transition-all flex items-start gap-3 bg-white"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 font-bold text-base flex items-center justify-center shrink-0">
-                      #{member.jerseyNumber}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-bold text-sm text-slate-900 truncate">
-                        {member.firstName} {member.lastName}
-                      </h4>
-                      <p className="text-xs text-blue-600 font-medium">{member.position}</p>
-                      <p className="text-xs text-slate-400 mt-1">{member.email}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            member.licenseStatus === 'Validée' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {member.licenseStatus}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          Certificat : {member.medicalCertValid ? '✓' : '⚠'}
-                        </span>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-500">Joueurs rattachés à cette équipe ({teamMembers.length})</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAssignPlayerModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4 text-blue-600" />
+                  Affecter / Gérer les joueurs
+                </button>
+              </div>
+
+              {teamMembers.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                  Aucun joueur affecté à cette équipe pour le moment. Cliquez sur "+ Affecter / Gérer les joueurs" pour sélectionner des licenciés.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {teamMembers.map(member => (
+                    <div
+                      key={member.id}
+                      className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-xs transition-all flex items-start gap-3 bg-white"
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 font-bold text-base flex items-center justify-center shrink-0">
+                        #{member.jerseyNumber}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-sm text-slate-900 truncate">
+                          {member.firstName} {member.lastName}
+                        </h4>
+                        <p className="text-xs text-blue-600 font-medium">{member.position}</p>
+                        <p className="text-xs text-slate-400 mt-1">{member.email}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              member.licenseStatus === 'Validée' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {member.licenseStatus}
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            Certificat : {member.medicalCertValid ? '✓' : '⚠'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -309,13 +421,15 @@ export const TeamsView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: Créer une Équipe */}
+      {/* Modal: Créer / Modifier une Équipe */}
       {isCreateTeamModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50">
               <div>
-                <h3 className="font-bold text-base text-slate-900">Créer une Nouvelle Équipe</h3>
+                <h3 className="font-bold text-base text-slate-900">
+                  {editingTeam ? 'Modifier l\'Équipe' : 'Créer une Nouvelle Équipe'}
+                </h3>
                 <p className="text-xs text-slate-500">Configuration de l'effectif, staff technique et gymnase d'entraînement</p>
               </div>
               <button
@@ -327,7 +441,7 @@ export const TeamsView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTeam} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSaveTeam} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Nom de l'Équipe *</label>
                 <input
@@ -432,10 +546,103 @@ export const TeamsView: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer"
                 >
-                  Créer l'Équipe
+                  {editingTeam ? 'Sauvegarder les modifications' : 'Créer l\'Équipe'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Affectation des Joueurs */}
+      {isAssignPlayerModalOpen && selectedTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50">
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Affecter des Joueurs à {selectedTeam.name}</h3>
+                <p className="text-xs text-slate-500">Sélectionnez les licenciés à ajouter ou retirer de cet effectif</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAssignPlayerModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-slate-100 bg-white">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Rechercher par nom, prénom, licence..."
+                  value={assignSearchTerm}
+                  onChange={e => setAssignSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-blue-600 outline-hidden bg-slate-50/50"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 space-y-2 overflow-y-auto flex-1 divide-y divide-slate-100">
+              {members
+                .filter(m =>
+                  assignSearchTerm === '' ||
+                  m.firstName.toLowerCase().includes(assignSearchTerm.toLowerCase()) ||
+                  m.lastName.toLowerCase().includes(assignSearchTerm.toLowerCase()) ||
+                  m.licenseNumber.toLowerCase().includes(assignSearchTerm.toLowerCase())
+                )
+                .map(m => {
+                  const isInCurrentTeam = m.teamId === selectedTeam.id;
+                  return (
+                    <div key={m.id} className="pt-2.5 first:pt-0 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                          #{m.jerseyNumber || '-'}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-xs text-slate-900">{m.firstName} {m.lastName}</div>
+                          <div className="text-[11px] text-slate-500">
+                            {m.position} • {m.category} • <span className="text-slate-400">{m.teamName || 'Sans équipe'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePlayerAssignment(m)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                          isInCurrentTeam
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        {isInCurrentTeam ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Membre - Retirer</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Affecter</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setIsAssignPlayerModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -33,8 +33,9 @@ export const MembersView: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isNewMemberModalOpen, setIsNewMemberModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
 
-  // New Member Form States
+  // Member Form States (Create & Edit)
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -48,60 +49,114 @@ export const MembersView: React.FC = () => {
   const [newLicenseNumber, setNewLicenseNumber] = useState(`LIC-${Math.floor(100000 + Math.random() * 900000)}`);
   const [newAmountDue, setNewAmountDue] = useState(290);
   const [newAmountPaid, setNewAmountPaid] = useState(290);
+  const [newGrossMonthlySalary, setNewGrossMonthlySalary] = useState<number | ''>('');
+  const [newDailySalary, setNewDailySalary] = useState<number | ''>('');
   const [newEmergencyName, setNewEmergencyName] = useState('');
   const [newEmergencyPhone, setNewEmergencyPhone] = useState('');
   const [newEmergencyRelation, setNewEmergencyRelation] = useState('Parent / Proche');
 
-  const handleCreateMember = async (e: React.FormEvent) => {
+  const openCreateModal = () => {
+    setEditingMember(null);
+    setNewFirstName('');
+    setNewLastName('');
+    setNewEmail('');
+    setNewPhone('');
+    setNewGender('M');
+    setNewBirthDate('2001-04-12');
+    setNewTeamId(teams[0]?.id || '');
+    setNewCategory('Senior Régionale');
+    setNewPosition(currentSportConfig.positions[0] || 'Joueur');
+    setNewJerseyNumber(10);
+    setNewLicenseNumber(`LIC-${Math.floor(100000 + Math.random() * 900000)}`);
+    setNewAmountDue(290);
+    setNewAmountPaid(290);
+    setNewGrossMonthlySalary('');
+    setNewDailySalary('');
+    setNewEmergencyName('');
+    setNewEmergencyPhone('');
+    setNewEmergencyRelation('Parent / Proche');
+    setIsNewMemberModalOpen(true);
+  };
+
+  const openEditModal = (member: Member) => {
+    setEditingMember(member);
+    setNewFirstName(member.firstName);
+    setNewLastName(member.lastName);
+    setNewEmail(member.email);
+    setNewPhone(member.phone);
+    setNewGender(member.gender);
+    setNewBirthDate(member.birthDate);
+    setNewTeamId(member.teamId);
+    setNewCategory(member.category);
+    setNewPosition(member.position);
+    setNewJerseyNumber(member.jerseyNumber);
+    setNewLicenseNumber(member.licenseNumber);
+    setNewAmountDue(member.amountDue);
+    setNewAmountPaid(member.amountPaid);
+    setNewGrossMonthlySalary(member.grossMonthlySalary ?? '');
+    setNewDailySalary(member.dailySalary ?? '');
+    setNewEmergencyName(member.emergencyContact?.name || '');
+    setNewEmergencyPhone(member.emergencyContact?.phone || '');
+    setNewEmergencyRelation(member.emergencyContact?.relation || 'Parent / Proche');
+    setIsNewMemberModalOpen(true);
+  };
+
+  const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFirstName.trim() || !newLastName.trim()) {
       showToast('Veuillez remplir au minimum le prénom et le nom du licencié.');
       return;
     }
     const assignedTeam = teams.find(t => t.id === newTeamId) || teams[0];
-    const newMemberData: Partial<Member> = {
+    const memberData: Partial<Member> = {
       firstName: newFirstName.trim(),
       lastName: newLastName.trim(),
       email: newEmail.trim() || `${newFirstName.toLowerCase()}.${newLastName.toLowerCase()}@club.fr`,
-      phone: newPhone.trim() || '06 12 34 56 78',
+      phone: newPhone.trim(),
       gender: newGender,
       birthDate: newBirthDate,
       category: newCategory,
-      teamId: assignedTeam ? assignedTeam.id : 't1',
-      teamName: assignedTeam ? assignedTeam.name : 'Équipe Principale',
+      teamId: assignedTeam ? assignedTeam.id : '',
+      teamName: assignedTeam ? assignedTeam.name : 'Sans équipe',
       licenseNumber: newLicenseNumber.trim() || `LIC-${Math.floor(100000 + Math.random() * 900000)}`,
-      licenseStatus: 'Validée',
+      licenseStatus: editingMember ? editingMember.licenseStatus : 'Validée',
       season: '2024-2025',
       medicalCertDate: new Date().toISOString().split('T')[0],
       medicalCertValid: true,
       position: newPosition,
       jerseyNumber: Number(newJerseyNumber) || 1,
       paymentStatus: Number(newAmountPaid) >= Number(newAmountDue) ? 'À jour' : 'Échelonné',
-      amountDue: Number(newAmountDue) || 290,
-      amountPaid: Number(newAmountPaid) || 290,
+      amountDue: Number(newAmountDue) || 0,
+      amountPaid: Number(newAmountPaid) || 0,
+      grossMonthlySalary: newGrossMonthlySalary !== '' ? Number(newGrossMonthlySalary) : undefined,
+      dailySalary: newDailySalary !== '' ? Number(newDailySalary) : undefined,
       emergencyContact: {
         name: newEmergencyName.trim() || 'Contact d\'urgence',
-        phone: newEmergencyPhone.trim() || '06 00 00 00 00',
+        phone: newEmergencyPhone.trim() || '',
         relation: newEmergencyRelation,
       },
       address: 'Métropole',
     };
 
     try {
-      const createdMember = await memberService.createMember(newMemberData, 1, currentSportConfig.id);
-      setMembers(prev => [createdMember, ...prev]);
-      showToast(`Licencié ${newFirstName} ${newLastName} enregistré avec succès en base de données !`);
+      if (editingMember) {
+        const updated = await memberService.updateMember(editingMember.id, memberData, 1, currentSportConfig.id);
+        setMembers(prev => prev.map(m => m.id === editingMember.id ? updated : m));
+        if (selectedMember?.id === editingMember.id) setSelectedMember(updated);
+        showToast(`Licencié ${newFirstName} ${newLastName} mis à jour avec succès !`);
+      } else {
+        const createdMember = await memberService.createMember(memberData, 1, currentSportConfig.id);
+        setMembers(prev => [createdMember, ...prev]);
+        showToast(`Licencié ${newFirstName} ${newLastName} enregistré avec succès en base de données !`);
+      }
     } catch (err: any) {
-      console.error('Erreur lors de la création du membre en BD:', err);
+      console.error('Erreur lors de la sauvegarde du membre:', err);
       showToast(`Erreur lors de l'enregistrement: ${err?.message || 'Serveur indisponible'}`);
       return;
     }
 
     setIsNewMemberModalOpen(false);
-    setNewFirstName('');
-    setNewLastName('');
-    setNewEmail('');
-    setNewPhone('');
+    setEditingMember(null);
   };
 
   // Filter members
@@ -203,7 +258,7 @@ export const MembersView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setIsNewMemberModalOpen(true)}
+            onClick={openCreateModal}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-all"
           >
             <Plus className="w-4 h-4" />
@@ -395,6 +450,14 @@ export const MembersView: React.FC = () => {
                         </button>
                         <button
                           type="button"
+                          onClick={() => openEditModal(member)}
+                          className="p-1.5 text-slate-400 hover:text-amber-600 rounded-lg hover:bg-amber-50"
+                          title="Modifier"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDeleteMember(member.id)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50"
                           title="Supprimer"
@@ -516,6 +579,24 @@ export const MembersView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Salaries if present */}
+              {(selectedMember.grossMonthlySalary != null || selectedMember.dailySalary != null) && (
+                <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-2">
+                  <h3 className="text-xs font-bold uppercase text-emerald-800 tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-emerald-600" />
+                    Rémunération & Primes
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-800 font-medium">
+                    {selectedMember.grossMonthlySalary != null && (
+                      <p>Salaire brut mensuel : <span className="font-bold">{selectedMember.grossMonthlySalary} €</span></p>
+                    )}
+                    {selectedMember.dailySalary != null && (
+                      <p>Prime journalière : <span className="font-bold">{selectedMember.dailySalary} €/jour</span></p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {selectedMember.notes && (
                 <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
                   <p className="text-xs font-bold text-blue-900 mb-1">Notes du staff</p>
@@ -528,10 +609,10 @@ export const MembersView: React.FC = () => {
             <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => handleToggleLicenseValidation(selectedMember.id)}
-                className="px-4 py-2 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-100 rounded-xl"
+                onClick={() => openEditModal(selectedMember)}
+                className="px-4 py-2 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-xl"
               >
-                Basculer Statut Licence
+                Modifier le licencié
               </button>
               <button
                 type="button"
@@ -545,13 +626,15 @@ export const MembersView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: Nouveau Licencié */}
+      {/* Modal: Nouveau / Modifier Licencié */}
       {isNewMemberModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50">
               <div>
-                <h3 className="font-bold text-base text-slate-900">Enregistrer un Nouveau Licencié</h3>
+                <h3 className="font-bold text-base text-slate-900">
+                  {editingMember ? 'Modifier le Licencié' : 'Enregistrer un Nouveau Licencié'}
+                </h3>
                 <p className="text-xs text-slate-500">Dossier administratif, affiliation fédérale et affectation d'équipe</p>
               </div>
               <button
@@ -563,7 +646,7 @@ export const MembersView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateMember} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSaveMember} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Prénom *</label>
@@ -648,6 +731,41 @@ export const MembersView: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">N° Licence</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: LIC-123456"
+                    value={newLicenseNumber}
+                    onChange={e => setNewLicenseNumber(e.target.value)}
+                    className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Salaire Mensuel Brut (€)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Ex: 2500"
+                    value={newGrossMonthlySalary}
+                    onChange={e => setNewGrossMonthlySalary(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Prime Entraînement / Jour (€)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Ex: 50"
+                    value={newDailySalary}
+                    onChange={e => setNewDailySalary(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 outline-hidden"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Équipe Affectée</label>
@@ -656,6 +774,7 @@ export const MembersView: React.FC = () => {
                     onChange={e => setNewTeamId(e.target.value)}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 outline-hidden"
                   >
+                    <option value="">Sans équipe</option>
                     {teams.map(t => (
                       <option key={t.id} value={t.id}>
                         {t.name}
@@ -743,7 +862,7 @@ export const MembersView: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer"
                 >
-                  Créer et Valider Licence
+                  {editingMember ? 'Sauvegarder les modifications' : 'Créer et Valider Licence'}
                 </button>
               </div>
             </form>

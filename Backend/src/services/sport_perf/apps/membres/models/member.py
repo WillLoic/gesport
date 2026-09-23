@@ -51,6 +51,18 @@ class Member(models.Model):
     medical_cert_valid = models.BooleanField(default=False, verbose_name="Certificat médical valide")
     medical_cert_date = models.DateField(null=True, blank=True, verbose_name="Date du certificat médical")
 
+    # Poste & Numéro de maillot par défaut
+    jersey_number = models.IntegerField(null=True, blank=True, verbose_name="Numéro de maillot")
+    position = models.CharField(max_length=50, blank=True, default='', verbose_name="Poste principal")
+
+    # Salaire & Primes
+    gross_monthly_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Salaire mensuel brut")
+    daily_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Salaire journalier (prime d'entraînement)")
+
+    # Cotisation
+    cotisation_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Montant cotisation")
+    cotisation_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Montant payé")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

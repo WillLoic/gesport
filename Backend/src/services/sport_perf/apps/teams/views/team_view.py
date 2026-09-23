@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from apps.teams.selectors.team_selector import list_club_teams, get_team_by_id
 from apps.teams.serializers.team_serializer import TeamSerializer, AddPlayerToTeamSerializer
-from apps.teams.services.team_service import create_team, add_player_to_team, remove_player_from_team
+from apps.teams.services.team_service import create_team, update_team, delete_team, add_player_to_team, remove_player_from_team
 
 class TeamListCreateView(APIView):
     permission_classes = [AllowAny]
@@ -31,6 +31,24 @@ class TeamDetailView(APIView):
         except Exception:
             return Response({"detail": "Équipe introuvable."}, status=status.HTTP_404_NOT_FOUND)
         return Response(TeamSerializer(team).data)
+
+    def put(self, request: Request, pk: int) -> Response:
+        try:
+            team = get_team_by_id(pk)
+        except Exception:
+            return Response({"detail": "Équipe introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = TeamSerializer(team, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        team = update_team(team=team, **serializer.validated_data)
+        return Response(TeamSerializer(team).data)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        try:
+            team = get_team_by_id(pk)
+        except Exception:
+            return Response({"detail": "Équipe introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        delete_team(team=team)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class TeamPlayersManageView(APIView):
     permission_classes = [AllowAny]

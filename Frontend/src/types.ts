@@ -69,6 +69,8 @@ export interface Member {
   paymentStatus: 'À jour' | 'En attente' | 'Échelonné';
   amountDue: number;
   amountPaid: number;
+  grossMonthlySalary?: number;
+  dailySalary?: number;
   emergencyContact: {
     name: string;
     phone: string;
