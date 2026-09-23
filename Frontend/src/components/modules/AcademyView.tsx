@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   GraduationCap,
   Plus,
@@ -8,65 +8,134 @@ import {
   Phone,
   X,
   User,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { AcademyStudent } from '../../types';
+import { academyService } from '../../services/academyService';
 
 export const AcademyView: React.FC = () => {
-  const { academy, setAcademy, staff, showToast } = useClub();
-  const [selectedStudent, setSelectedStudent] = useState<AcademyStudent | null>(academy[0] || null);
+  const { academy, setAcademy, members, showToast } = useClub();
+  const [selectedStudent, setSelectedStudent] = useState<AcademyStudent | null>(null);
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<AcademyStudent | null>(null);
 
-  // New Student Form State
+  // Form State
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('U18 Espoirs');
-  const [newAge, setNewAge] = useState(16);
-  const [newSchoolGrade, setNewSchoolGrade] = useState('1ère Générale (Lycée Sport-Études)');
+  const [newAge, setNewAge] = useState<number | ''>('');
+  const [newSchoolGrade, setNewSchoolGrade] = useState('');
   const [newParentsName, setNewParentsName] = useState('');
   const [newParentsPhone, setNewParentsPhone] = useState('');
-  const [newTutorCoach, setNewTutorCoach] = useState('Marc Lemoine');
+  const [newTutorCoach, setNewTutorCoach] = useState('');
   const [newSchoolSupport, setNewSchoolSupport] = useState(false);
-  const [newCoachComments, setNewCoachComments] = useState('Fort potentiel athlétique et excellente écoute tactique. Bon équilibre avec la scolarité.');
+  const [newCoachComments, setNewCoachComments] = useState('');
 
-  const handleCreateStudent = (e: React.FormEvent) => {
+  // Keep selectedStudent in sync with academy list updates
+  useEffect(() => {
+    if (academy.length > 0) {
+      if (!selectedStudent || !academy.some(s => s.id === selectedStudent.id)) {
+        setSelectedStudent(academy[0]);
+      }
+    } else {
+      setSelectedStudent(null);
+    }
+  }, [academy]);
+
+  const handleOpenCreateModal = () => {
+    setEditingStudent(null);
+    const defaultMember = members[0];
+    setSelectedMemberId(defaultMember ? defaultMember.id : '');
+    setNewName(defaultMember ? `${defaultMember.firstName} ${defaultMember.lastName}` : '');
+    setNewCategory(defaultMember?.category || 'U18 Espoirs');
+    setNewAge('');
+    setNewSchoolGrade('');
+    setNewParentsName('');
+    setNewParentsPhone('');
+    setNewTutorCoach('');
+    setNewSchoolSupport(false);
+    setNewCoachComments('');
+    setIsNewStudentModalOpen(true);
+  };
+
+  const handleMemberSelect = (memberId: string) => {
+    setSelectedMemberId(memberId);
+    const found = members.find(m => m.id === memberId);
+    if (found) {
+      setNewName(`${found.firstName} ${found.lastName}`);
+      if (found.category) setNewCategory(found.category);
+    }
+  };
+
+  const handleOpenEditModal = (student: AcademyStudent, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingStudent(student);
+    setSelectedMemberId(student.memberId || (members[0] ? members[0].id : ''));
+    setNewName(student.studentName);
+    setNewCategory(student.category);
+    setNewAge(student.age || '');
+    setNewSchoolGrade(student.schoolGrade || '');
+    setNewParentsName(student.parentsName || '');
+    setNewParentsPhone(student.parentsPhone || '');
+    setNewTutorCoach(student.tutorCoachName || '');
+    setNewSchoolSupport(student.schoolSupportNeeded);
+    setNewCoachComments(student.coachComments || '');
+    setIsNewStudentModalOpen(true);
+  };
+
+  const handleDeleteStudent = async (studentId: string, studentName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`Voulez-vous vraiment supprimer le dossier de ${studentName} ?`)) return;
+
+    try {
+      await academyService.deleteStudent(studentId);
+      setAcademy(prev => prev.filter(s => s.id !== studentId));
+      if (selectedStudent?.id === studentId) {
+        setSelectedStudent(null);
+      }
+      showToast(`Dossier académicien ${studentName} supprimé.`);
+    } catch (err) {
+      showToast('Erreur lors de la suppression.');
+    }
+  };
+
+  const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) {
       showToast('Veuillez renseigner le nom de l\'académicien.');
       return;
     }
 
-    const newStudent: AcademyStudent = {
-      id: `acad-${Date.now()}`,
-      memberId: `mem-${Date.now()}`,
+    const payload: Partial<AcademyStudent> = {
+      ...(editingStudent ? { id: editingStudent.id } : {}),
+      memberId: selectedMemberId,
       studentName: newName.trim(),
       category: newCategory as any,
       age: Number(newAge) || 16,
-      schoolGrade: newSchoolGrade,
+      schoolGrade: newSchoolGrade.trim() || 'Niveau non précisé',
       parentsName: newParentsName.trim() || 'Parents Référents',
-      parentsPhone: newParentsPhone.trim() || '06 11 22 33 44',
-      tutorCoachName: newTutorCoach,
+      parentsPhone: newParentsPhone.trim() || '',
+      tutorCoachName: newTutorCoach.trim() || 'Coach Tuteur',
       schoolSupportNeeded: newSchoolSupport,
       coachComments: newCoachComments.trim(),
-      progressScores: [
-        {
-          quarter: 'Trimestre en cours (Évaluation initiale)',
-          technicalScore: 15,
-          tacticalScore: 14,
-          athleticScore: 16,
-          attitudeScore: 18,
-        },
-      ],
     };
 
-    setAcademy(prev => [newStudent, ...prev]);
-    setSelectedStudent(newStudent);
-    setIsNewStudentModalOpen(false);
-    showToast(`Jeune espoir ${newStudent.studentName} inscrit à l'Académie !`);
-
-    // Reset Form
-    setNewName('');
-    setNewParentsName('');
-    setNewParentsPhone('');
+    try {
+      const saved = await academyService.createOrUpdateStudent(payload);
+      if (editingStudent) {
+        setAcademy(prev => prev.map(s => (s.id === saved.id ? saved : s)));
+        showToast(`Fiche de ${saved.studentName} mise à jour.`);
+      } else {
+        setAcademy(prev => [saved, ...prev]);
+        showToast(`Jeune espoir ${saved.studentName} inscrit à l'Académie !`);
+      }
+      setSelectedStudent(saved);
+      setIsNewStudentModalOpen(false);
+    } catch (err) {
+      showToast('Erreur lors de l\'enregistrement.');
+    }
   };
 
   return (
@@ -82,7 +151,7 @@ export const AcademyView: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setIsNewStudentModalOpen(true)}
+          onClick={handleOpenCreateModal}
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer transition-all"
         >
           <Plus className="w-4 h-4" />
@@ -94,52 +163,89 @@ export const AcademyView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Students Grid (2 cols) */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {academy.map(student => {
-              const isSelected = selectedStudent?.id === student.id;
-              return (
-                <div
-                  key={student.id}
-                  onClick={() => setSelectedStudent(student)}
-                  className={`p-5 rounded-2xl bg-white border transition-all cursor-pointer space-y-3 ${
-                    isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300 shadow-xs'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-bold text-base text-slate-900">{student.studentName}</h3>
-                      <p className="text-xs text-slate-500">
-                        {student.category} • {student.age} ans • Classe : {student.schoolGrade}
-                      </p>
+          {academy.length === 0 ? (
+            <div className="p-12 bg-white rounded-2xl border border-slate-200 text-center space-y-3">
+              <GraduationCap className="w-12 h-12 text-slate-300 mx-auto" />
+              <h3 className="font-bold text-slate-700 text-base">Aucun académicien inscrit</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Aucun dossier de suivi sport-études n'est actuellement enregistré dans la base de données.
+              </p>
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                Ajouter un Académicien
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {academy.map(student => {
+                const isSelected = selectedStudent?.id === student.id;
+                return (
+                  <div
+                    key={student.id}
+                    onClick={() => setSelectedStudent(student)}
+                    className={`p-5 rounded-2xl bg-white border transition-all cursor-pointer space-y-3 relative ${
+                      isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300 shadow-xs'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-base text-slate-900">{student.studentName}</h3>
+                        <p className="text-xs text-slate-500">
+                          {student.category} • {student.age} ans • Classe : {student.schoolGrade}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={e => handleOpenEditModal(student, e)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Modifier le dossier"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => handleDeleteStudent(student.id, student.studentName, e)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Supprimer le dossier"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 inline-block">
                       Tuteur : {student.tutorCoachName}
                     </span>
-                  </div>
 
-                  <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
-                    "{student.coachComments}"
-                  </p>
+                    <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
+                      "{student.coachComments}"
+                    </p>
 
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                    <span className="flex items-center gap-1 text-slate-500">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" /> {student.parentsPhone}
-                    </span>
-                    {student.schoolSupportNeeded ? (
-                      <span className="text-rose-600 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded">
-                        Soutien requis
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" /> {student.parentsPhone || 'Non renseigné'}
                       </span>
-                    ) : (
-                      <span className="text-emerald-600 font-semibold text-[11px] bg-emerald-50 px-2 py-0.5 rounded">
-                        Scolarité OK
-                      </span>
-                    )}
+                      {student.schoolSupportNeeded ? (
+                        <span className="text-rose-600 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded">
+                          Soutien requis
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 font-semibold text-[11px] bg-emerald-50 px-2 py-0.5 rounded">
+                          Scolarité OK
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Selected Student Detailed Record */}
@@ -179,7 +285,7 @@ export const AcademyView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => showToast(`Bilan complet généré pour les parents de ${selectedStudent.studentName}.`)}
-                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs cursor-pointer transition-colors"
               >
                 Générer Bulletin Trimestriel PDF
               </button>
@@ -192,7 +298,7 @@ export const AcademyView: React.FC = () => {
         </div>
       </div>
 
-      {/* New Student Modal */}
+      {/* New / Edit Student Modal */}
       {isNewStudentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-6 my-8 animate-in fade-in zoom-in-95 duration-150">
@@ -202,7 +308,9 @@ export const AcademyView: React.FC = () => {
                   <GraduationCap className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-slate-900 font-display">Ajouter un Académicien</h3>
+                  <h3 className="font-bold text-lg text-slate-900 font-display">
+                    {editingStudent ? 'Modifier le dossier Académicien' : 'Ajouter un Académicien'}
+                  </h3>
                   <p className="text-xs text-slate-500">Inscription au pôle espoir et double projet sport-études</p>
                 </div>
               </div>
@@ -215,7 +323,25 @@ export const AcademyView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateStudent} className="space-y-4">
+            <form onSubmit={handleSaveStudent} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Membre / Joueur associé
+                </label>
+                <select
+                  value={selectedMemberId}
+                  onChange={e => handleMemberSelect(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
+                >
+                  {members.length === 0 && <option value="">Aucun membre disponible en base</option>}
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.firstName} {m.lastName} ({m.category} - {m.teamName})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -257,8 +383,9 @@ export const AcademyView: React.FC = () => {
                     type="number"
                     min={10}
                     max={23}
+                    placeholder="Ex: 16"
                     value={newAge}
-                    onChange={e => setNewAge(Number(e.target.value))}
+                    onChange={e => setNewAge(e.target.value ? Number(e.target.value) : '')}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
                   />
                 </div>
@@ -297,7 +424,7 @@ export const AcademyView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="06 00 00 00 00"
+                    placeholder="Ex: 06 11 22 33 44"
                     value={newParentsPhone}
                     onChange={e => setNewParentsPhone(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -311,7 +438,7 @@ export const AcademyView: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  placeholder="Nom du coach tuteur"
+                  placeholder="Ex: Marc Lemoine"
                   value={newTutorCoach}
                   onChange={e => setNewTutorCoach(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -324,6 +451,7 @@ export const AcademyView: React.FC = () => {
                 </label>
                 <textarea
                   rows={2}
+                  placeholder="Appréciation globale du comportement et niveau sportif..."
                   value={newCoachComments}
                   onChange={e => setNewCoachComments(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -347,15 +475,15 @@ export const AcademyView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsNewStudentModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors cursor-pointer"
                 >
-                  Inscrire l'Académicien
+                  {editingStudent ? 'Mettre à jour' : "Inscrire l'Académicien"}
                 </button>
               </div>
             </form>

@@ -18,6 +18,7 @@ export interface BackendTrainingExercise {
 export interface BackendTrainingSession {
   id?: number;
   team: number;
+  team_id?: number;
   team_name?: string;
   title: string;
   session_date: string;
