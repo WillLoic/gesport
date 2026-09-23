@@ -112,7 +112,20 @@ class TrainingSessionListCreateView(APIView):
     def post(self, request: Request) -> Response:
         serializer = TrainingSessionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        session = create_training_session(**serializer.validated_data)
+        validated = serializer.validated_data.copy()
+        # Extraire le team object du serializer validated_data (FK résolu par DRF)
+        team_obj = validated.pop('team', None)
+        exercises_list = validated.pop('exercises', [])
+        try:
+            session = create_training_session(
+                team=team_obj,
+                title=validated.pop('title', "Séance d'entraînement"),
+                session_date=validated.pop('session_date', None),
+                exercises=exercises_list,
+                **validated
+            )
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(TrainingSessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
 class TrainingSessionDetailView(APIView):
@@ -130,8 +143,9 @@ class TrainingSessionDetailView(APIView):
             session = TrainingSession.objects.get(pk=pk)
             serializer = TrainingSessionSerializer(session, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(TrainingSessionSerializer(session).data)
+            updated_session = serializer.save()
+            updated_session.refresh_from_db()
+            return Response(TrainingSessionSerializer(updated_session).data)
         except TrainingSession.DoesNotExist:
             return Response({"detail": "Séance introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
