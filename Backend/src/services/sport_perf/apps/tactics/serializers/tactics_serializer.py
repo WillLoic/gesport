@@ -17,6 +17,7 @@ class TrainingExerciseSerializer(serializers.ModelSerializer):
         }
 
 class TrainingSessionSerializer(serializers.ModelSerializer):
+    team_id = serializers.IntegerField(write_only=True)  # ← pour l'écriture
     team_name = serializers.CharField(source='team.name', read_only=True)
     exercises_detail = TrainingExerciseSerializer(source='exercises', many=True, read_only=True)
     team = serializers.PrimaryKeyRelatedField(
@@ -34,7 +35,7 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainingSession
         fields = [
-            'id', 'team', 'team_name', 'title', 'session_date', 'start_time', 'end_time',
+            'id', 'team_id', 'team_name', 'title', 'session_date', 'start_time', 'end_time',
             'duration_minutes', 'coach_name', 'theme', 'intensity', 'exercises', 'exercises_detail',
             'attendance_count', 'total_summoned', 'coach_feedback', 'created_at'
         ]
