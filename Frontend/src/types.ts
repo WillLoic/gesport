@@ -117,6 +117,13 @@ export interface Team {
 
 export type EventType = 'match_official' | 'match_friendly' | 'training' | 'tournament' | 'meeting' | 'medical';
 
+export interface SummonedPlayer {
+  playerId: string;
+  playerName: string;
+  status: 'Confirmé' | 'Absent' | 'En attente' | 'Blessé';
+  transport: 'Club Mini-bus' | 'Voiture perso' | 'Covoiturage';
+}
+
 export interface SportEvent {
   id: string;
   title: string;
@@ -137,12 +144,7 @@ export interface SportEvent {
     away: number;
     sets?: string;
   };
-  summonedPlayers: {
-    playerId: string;
-    playerName: string;
-    status: 'Confirmé' | 'Absent' | 'En attente' | 'Blessé';
-    transport: 'Club Mini-bus' | 'Voiture perso' | 'Covoiturage';
-  }[];
+  summonedPlayers: SummonedPlayer[];
   transportVehicleId?: string;
   referee?: string;
   notes?: string;
