@@ -4,6 +4,15 @@ from apps.membres.models.member import Member
 def create_team(*, club_id: int, name: str, **kwargs) -> Team:
     return Team.objects.create(club_id=club_id, name=name, **kwargs)
 
+def update_team(*, team: Team, **kwargs) -> Team:
+    for key, value in kwargs.items():
+        setattr(team, key, value)
+    team.save()
+    return team
+
+def delete_team(*, team: Team) -> None:
+    team.delete()
+
 def add_player_to_team(*, team: Team, member_id: int, jersey_number: int = None, position: str = '') -> TeamPlayer:
     member = Member.objects.get(pk=member_id)
     tp, _ = TeamPlayer.objects.update_or_create(

@@ -40,6 +40,37 @@ export const CalendarView: React.FC = () => {
   const [newLocation, setNewLocation] = useState('Gymnase Principal');
   const [newHall, setNewHall] = useState('Terrain A');
   const [newNotes, setNewNotes] = useState('');
+  const [selectedCallupPlayerIds, setSelectedCallupPlayerIds] = useState<string[]>([]);
+
+  const currentTeamMembers = members.filter(m => m.teamId === newTeamId);
+
+  const openCreateEventModal = () => {
+    const defaultTeamId = teams[0]?.id || '';
+    setNewTeamId(defaultTeamId);
+    const squad = members.filter(m => m.teamId === defaultTeamId);
+    setSelectedCallupPlayerIds(squad.map(m => m.id));
+    setIsCreateEventModalOpen(true);
+  };
+
+  const handleTeamChange = (teamId: string) => {
+    setNewTeamId(teamId);
+    const squad = members.filter(m => m.teamId === teamId);
+    setSelectedCallupPlayerIds(squad.map(m => m.id));
+  };
+
+  const handleToggleAllCallups = () => {
+    if (selectedCallupPlayerIds.length === currentTeamMembers.length) {
+      setSelectedCallupPlayerIds([]);
+    } else {
+      setSelectedCallupPlayerIds(currentTeamMembers.map(m => m.id));
+    }
+  };
+
+  const handleTogglePlayerCallup = (id: string) => {
+    setSelectedCallupPlayerIds(prev =>
+      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    );
+  };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +80,7 @@ export const CalendarView: React.FC = () => {
     }
 
     const assignedTeam = teams.find(t => t.id === newTeamId) || teams[0];
-    const teamSquad = members.filter(m => m.teamId === assignedTeam?.id);
+    const selectedMembers = members.filter(m => selectedCallupPlayerIds.includes(m.id));
 
     const newEvData: Partial<SportEvent> = {
       title: newEventTitle.trim(),
@@ -66,7 +97,7 @@ export const CalendarView: React.FC = () => {
       hall: newHall,
       notes: newNotes.trim() || undefined,
       status: 'Programmé',
-      summonedPlayers: teamSquad.map(m => ({
+      summonedPlayers: selectedMembers.map(m => ({
         playerId: m.id,
         playerName: `${m.firstName} ${m.lastName}`,
         status: 'En attente',
@@ -76,9 +107,18 @@ export const CalendarView: React.FC = () => {
 
     try {
       const createdEvent = await competitionService.createMatch(newEvData, Number(assignedTeam?.id) || 1);
+      
+      for (const p of selectedMembers) {
+        try {
+          await competitionService.addCallup(createdEvent.id, p.id, 'convocations');
+        } catch (err) {
+          console.warn(`Erreur convocation pour ${p.firstName}:`, err);
+        }
+      }
+
       setEvents(prev => [createdEvent, ...prev]);
       setSelectedEvent(createdEvent);
-      showToast(`Événement "${createdEvent.title}" enregistré avec succès en base de données !`);
+      showToast(`Événement "${createdEvent.title}" avec ${selectedMembers.length} joueurs convoqués enregistré !`);
     } catch (err: any) {
       console.error('Erreur lors de la création de la compétition en BD:', err);
       showToast(`Erreur lors de l'enregistrement: ${err?.message || 'Serveur indisponible'}`);
@@ -187,7 +227,7 @@ export const CalendarView: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setIsCreateEventModalOpen(true)}
+            onClick={openCreateEventModal}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -469,7 +509,7 @@ export const CalendarView: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 mb-1">Équipe Concernée</label>
                   <select
                     value={newTeamId}
-                    onChange={e => setNewTeamId(e.target.value)}
+                    onChange={e => handleTeamChange(e.target.value)}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 outline-hidden"
                   >
                     {teams.map(t => (
@@ -589,6 +629,47 @@ export const CalendarView: React.FC = () => {
                   onChange={e => setNewNotes(e.target.value)}
                   className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 outline-hidden"
                 />
+              </div>
+
+              {/* Joueurs convoqués checklist */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">
+                    Joueurs Convoqués ({selectedCallupPlayerIds.length} / {currentTeamMembers.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleToggleAllCallups}
+                    className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    {selectedCallupPlayerIds.length === currentTeamMembers.length ? 'Tout décocher' : 'Tout cocher'}
+                  </button>
+                </div>
+
+                {currentTeamMembers.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Aucun joueur dans cette équipe pour le moment.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto">
+                    {currentTeamMembers.map(m => {
+                      const isChecked = selectedCallupPlayerIds.includes(m.id);
+                      return (
+                        <label
+                          key={m.id}
+                          className="flex items-center gap-2 p-1.5 bg-white border border-slate-200 rounded-lg text-xs cursor-pointer hover:bg-slate-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleTogglePlayerCallup(m.id)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span className="font-medium text-slate-800 truncate">{m.firstName} {m.lastName}</span>
+                          <span className="text-[10px] text-slate-400 ml-auto shrink-0">#{m.jerseyNumber || '-'}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
