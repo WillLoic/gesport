@@ -220,15 +220,9 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Événements & Matchs synchronisés avec le microservice sport_perf/competitions
   const [events, setEvents] = useState<SportEvent[]>([]);
 
-  const [exercises, setExercises] = useState<TrainingExercise[]>(() => {
-    const savedSport = (localStorage.getItem('sportflow_current_sport') as SportType) || 'volleyball';
-    return getExercisesForSport(savedSport);
-  });
-
-  const [trainings, setTrainings] = useState<TrainingSession[]>(() => {
-    const saved = localStorage.getItem('sportflow_trainings');
-    return saved ? JSON.parse(saved) : INITIAL_TRAININGS;
-  });
+  // Exercices & Entraînements synchronisés uniquement avec le microservice backend (sport_perf / tactics)
+  const [exercises, setExercises] = useState<TrainingExercise[]>([]);
+  const [trainings, setTrainings] = useState<TrainingSession[]>([]);
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem('sportflow_attendance');
@@ -410,23 +404,21 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     tacticsService
       .getExercises(1)
       .then((remoteExercises) => {
-        if (remoteExercises && remoteExercises.length > 0) {
-          setExercises(remoteExercises);
-        }
+        setExercises(remoteExercises || []);
       })
       .catch((err) => {
         console.warn('Microservice sport_perf (tactics/exercises) non disponible:', err);
+        setExercises([]);
       });
 
     tacticsService
       .getSessions(1)
       .then((remoteSessions) => {
-        if (remoteSessions && remoteSessions.length > 0) {
-          setTrainings(remoteSessions);
-        }
+        setTrainings(remoteSessions || []);
       })
       .catch((err) => {
         console.warn('Microservice sport_perf (tactics/sessions) non disponible:', err);
+        setTrainings([]);
       });
   }, []);
 
@@ -436,9 +428,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('sportflow_current_sport', sport);
     const newConfig = SPORT_PRESETS[sport] || SPORT_PRESETS.volleyball;
     const newSportTeams = getTeamsForSport(sport);
-    const newSportExercises = getExercisesForSport(sport);
     setTeams(newSportTeams);
-    setExercises(newSportExercises);
 
     // Update members to match sport positions and new teams
     setMembers(prev =>
@@ -449,7 +439,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }))
     );
 
-    // Update trainings with relevant team names and sport drills
+    // Update trainings with relevant team names
     setTrainings(prev =>
       prev.map((t, idx) => {
         const assignedTeam = newSportTeams[idx % newSportTeams.length] || newSportTeams[0];
@@ -457,8 +447,6 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...t,
           teamId: assignedTeam ? assignedTeam.id : 't1',
           teamName: assignedTeam ? assignedTeam.name : 'Équipe 1',
-          theme: newSportExercises[idx % newSportExercises.length]?.title || t.theme,
-          exercises: newSportExercises.slice(0, 3),
         };
       })
     );
