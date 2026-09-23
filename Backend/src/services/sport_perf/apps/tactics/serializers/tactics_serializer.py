@@ -4,12 +4,12 @@ from apps.tactics.models.tactics import TacticalBoard, TrainingExercise, Trainin
 class TacticalBoardSerializer(serializers.ModelSerializer):
     class Meta:
         model = TacticalBoard
-        fields = ['id', 'club_id', 'title', 'sport_type', 'system_name', 'lineup_json', 'notes', 'coach_id', 'created_at']
+        fields = ['id', 'club_id', 'title', 'sport_type', 'system_name', 'lineup_json', 'notes', 'coach_id', 'created_at', 'updated_at']
 
 class TrainingExerciseSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainingExercise
-        fields = ['id', 'club_id', 'title', 'sport_type', 'category', 'duration_minutes', 'description', 'created_at']
+        fields = ['id', 'club_id', 'title', 'sport_type', 'category', 'duration_minutes', 'intensity', 'description', 'instructions_json', 'diagram_data', 'created_at']
 
 class TrainingSessionSerializer(serializers.ModelSerializer):
     team_name = serializers.CharField(source='team.name', read_only=True)
@@ -17,4 +17,8 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrainingSession
-        fields = ['id', 'team', 'team_name', 'title', 'session_date', 'duration_minutes', 'exercises', 'exercises_detail', 'attendance_count', 'created_at']
+        fields = [
+            'id', 'team', 'team_name', 'title', 'session_date', 'start_time', 'end_time',
+            'duration_minutes', 'coach_name', 'theme', 'intensity', 'exercises', 'exercises_detail',
+            'attendance_count', 'total_summoned', 'coach_feedback', 'created_at'
+        ]

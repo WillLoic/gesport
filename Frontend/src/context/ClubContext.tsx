@@ -38,6 +38,7 @@ import {
 import { memberService } from '../services/memberService';
 import { teamService } from '../services/teamService';
 import { competitionService } from '../services/competitionService';
+import { tacticsService } from '../services/tacticsService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -401,6 +402,31 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       .catch((err) => {
         console.warn('Microservice sport_perf (competitions) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des exercices & entraînements depuis le microservice backend (sport_perf / tactics)
+  useEffect(() => {
+    tacticsService
+      .getExercises(1)
+      .then((remoteExercises) => {
+        if (remoteExercises && remoteExercises.length > 0) {
+          setExercises(remoteExercises);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (tactics/exercises) non disponible:', err);
+      });
+
+    tacticsService
+      .getSessions(1)
+      .then((remoteSessions) => {
+        if (remoteSessions && remoteSessions.length > 0) {
+          setTrainings(remoteSessions);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (tactics/sessions) non disponible:', err);
       });
   }, []);
 

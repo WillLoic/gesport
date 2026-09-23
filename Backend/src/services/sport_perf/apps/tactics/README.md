@@ -1,1 +1,1 @@
-L'application tactics gere les schémas tactiques multi-sports et les exercices. Elle peut etre liée à l'application teams et à l'application membres.
+L'application tactics gere les schémas tactiques multi-sports et les exercices. Elle peut être liée à l'application teams et à l'application membres.
