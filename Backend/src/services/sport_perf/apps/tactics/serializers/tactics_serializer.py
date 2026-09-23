@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from apps.tactics.models.tactics import TacticalBoard, TrainingExercise, TrainingSession
+from apps.teams.models.team import Team
 
 class TacticalBoardSerializer(serializers.ModelSerializer):
     class Meta:
@@ -10,10 +11,19 @@ class TrainingExerciseSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainingExercise
         fields = ['id', 'club_id', 'title', 'sport_type', 'category', 'duration_minutes', 'intensity', 'description', 'instructions_json', 'diagram_data', 'created_at']
+        extra_kwargs = {
+            'club_id': {'required': False, 'default': 1},
+            'created_at': {'read_only': True},
+        }
 
 class TrainingSessionSerializer(serializers.ModelSerializer):
     team_name = serializers.CharField(source='team.name', read_only=True)
     exercises_detail = TrainingExerciseSerializer(source='exercises', many=True, read_only=True)
+    team = serializers.PrimaryKeyRelatedField(
+        queryset=Team.objects.all(),
+        required=False,
+        allow_null=True
+    )
     exercises = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=TrainingExercise.objects.all(),
@@ -29,7 +39,7 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
             'attendance_count', 'total_summoned', 'coach_feedback', 'created_at'
         ]
         extra_kwargs = {
-            'team': {'required': True},
             'created_at': {'read_only': True},
         }
+
 

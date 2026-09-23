@@ -105,8 +105,11 @@ class TrainingSessionListCreateView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        team_id = request.query_params.get('team_id', 1)
-        sessions = list_team_training_sessions(int(team_id))
+        team_id = request.query_params.get('team_id')
+        if team_id:
+            sessions = list_team_training_sessions(int(team_id))
+        else:
+            sessions = TrainingSession.objects.all().prefetch_related('exercises').order_by('-session_date')
         return Response(TrainingSessionSerializer(sessions, many=True).data)
 
     def post(self, request: Request) -> Response:
