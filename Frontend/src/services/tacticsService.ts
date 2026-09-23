@@ -161,10 +161,14 @@ export const tacticsService = {
   },
 
   /**
-   * Récupère les séances d'entraînement d'une équipe depuis le backend
+   * Récupère les séances d'entraînement d'une équipe ou toutes les séances depuis le backend
    */
-  async getSessions(teamId = 1): Promise<TrainingSession[]> {
-    const data = await apiFetch<BackendTrainingSession[]>(`/sport/tactics/sessions/?team_id=${teamId}`);
+  async getSessions(teamId?: number | string): Promise<TrainingSession[]> {
+    const numericTeamId = teamId ? Number(teamId) : NaN;
+    const url = !isNaN(numericTeamId) && numericTeamId > 0
+      ? `/sport/tactics/sessions/?team_id=${numericTeamId}`
+      : '/sport/tactics/sessions/';
+    const data = await apiFetch<BackendTrainingSession[]>(url);
     return data.map(mapBackendSessionToFrontend);
   },
 

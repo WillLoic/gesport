@@ -412,7 +412,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
     tacticsService
-      .getSessions(1)
+      .getSessions()
       .then((remoteSessions) => {
         setTrainings(remoteSessions || []);
       })
