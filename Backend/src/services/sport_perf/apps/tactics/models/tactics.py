@@ -13,7 +13,7 @@ class TacticalBoard(models.Model):
     title = models.CharField(max_length=150, verbose_name="Titre du schéma")
     sport_type = models.CharField(max_length=30, default='football', verbose_name="Sport")
     system_name = models.CharField(max_length=50, default='4-3-3', verbose_name="Nom du système (ex: 4-3-3, 5-1)")
-    lineup_json = models.JSONField(default=dict, verbose_name="Positions des joueurs (JSON)")
+    lineup_json = models.JSONField(default=dict, blank=True, verbose_name="Positions des joueurs (JSON)")
     notes = models.TextField(blank=True, default='', verbose_name="Consignes tactiques")
     coach_id = models.IntegerField(null=True, blank=True, verbose_name="ID Coach IAM")
 
@@ -37,7 +37,10 @@ class TrainingExercise(models.Model):
     sport_type = models.CharField(max_length=30, default='football', verbose_name="Sport")
     category = models.CharField(max_length=50, default='Physique / Cardio', verbose_name="Catégorie")
     duration_minutes = models.IntegerField(default=15, verbose_name="Durée (minutes)")
+    intensity = models.CharField(max_length=30, default='Moyenne', verbose_name="Intensité")
     description = models.TextField(blank=True, default='', verbose_name="Description & Consignes")
+    instructions_json = models.JSONField(default=list, blank=True, verbose_name="Instructions détaillées")
+    diagram_data = models.JSONField(default=dict, blank=True, verbose_name="Données du schéma tactique")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -56,9 +59,16 @@ class TrainingSession(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='training_sessions', verbose_name="Équipe")
     title = models.CharField(max_length=150, verbose_name="Titre de la séance")
     session_date = models.DateTimeField(verbose_name="Date et heure de la séance")
+    start_time = models.CharField(max_length=20, default='19:00', verbose_name="Heure Début")
+    end_time = models.CharField(max_length=20, default='21:00', verbose_name="Heure Fin")
     duration_minutes = models.IntegerField(default=90, verbose_name="Durée totale (minutes)")
+    coach_name = models.CharField(max_length=100, default='Coach Principal', verbose_name="Entraîneur Responsable")
+    theme = models.CharField(max_length=200, default='Perfectionnement Technique', verbose_name="Thème principal")
+    intensity = models.CharField(max_length=30, default='Moyenne', verbose_name="Intensité")
     exercises = models.ManyToManyField(TrainingExercise, blank=True, related_name='sessions', verbose_name="Exercices du programme")
-    attendance_count = models.IntegerField(default=0, verbose_name="Nombre de présents")
+    attendance_count = models.IntegerField(default=12, verbose_name="Nombre de présents")
+    total_summoned = models.IntegerField(default=14, verbose_name="Nombre total convoqués")
+    coach_feedback = models.TextField(blank=True, default='', verbose_name="Débrief / Feedback Coach")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
