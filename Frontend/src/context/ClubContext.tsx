@@ -40,6 +40,7 @@ import { teamService } from '../services/teamService';
 import { competitionService } from '../services/competitionService';
 import { tacticsService } from '../services/tacticsService';
 import { medicalService } from '../services/medicalService';
+import { academyService } from '../services/academyService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -333,10 +334,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : INITIAL_TALENTS;
   });
 
-  const [academy, setAcademy] = useState<AcademyStudent[]>(() => {
-    const saved = localStorage.getItem('sportflow_academy');
-    return saved ? JSON.parse(saved) : INITIAL_ACADEMY;
-  });
+  // Élèves Académie synchronisés uniquement avec le microservice backend (sport_perf / academy)
+  const [academy, setAcademy] = useState<AcademyStudent[]>([]);
 
   const [channels, setChannels] = useState<ChatChannel[]>(() => {
     const saved = localStorage.getItem('sportflow_channels');
@@ -433,6 +432,20 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setMedicalRecords([]);
       });
   }, []);
+
+  // Chargement initial des élèves de l'Académie depuis le microservice backend (sport_perf / academy)
+  useEffect(() => {
+    academyService
+      .getStudents(1)
+      .then((remoteStudents) => {
+        setAcademy(remoteStudents || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (academy) non disponible:', err);
+        setAcademy([]);
+      });
+  }, []);
+
 
   // Multi-Sport Switcher logic
   const setCurrentSport = (sport: SportType) => {

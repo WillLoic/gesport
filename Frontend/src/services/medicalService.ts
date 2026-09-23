@@ -24,12 +24,23 @@ export function mapBackendMedicalRecordToFrontend(bMed: BackendMedicalRecord): M
     ? `${bMed.member_detail.first_name || ''} ${bMed.member_detail.last_name || ''}`.trim()
     : 'Licencié';
 
-  const memberTeam = bMed.member_detail?.team_name || 'Équipe 1';
+  let memberTeam = 'Sans équipe';
+  if (bMed.member_detail?.teams && bMed.member_detail.teams.length > 0) {
+    memberTeam = bMed.member_detail.teams[0].team_name;
+  } else if (bMed.member_detail?.team_name) {
+    memberTeam = bMed.member_detail.team_name;
+  }
 
   let mappedStatus: MedicalRecord['status'] = 'Indisponible';
-  if (bMed.status === 'Réathlétisation') mappedStatus = 'Réathlétisation';
-  else if (bMed.status === 'Apte' || bMed.status === 'Guéri / Feu vert') mappedStatus = 'Guéri / Feu vert';
-  else if (bMed.status === 'Apte avec réserve') mappedStatus = 'Apte avec réserve';
+  if (bMed.status === 'Réathlétisation') {
+    mappedStatus = 'Réathlétisation';
+  } else if (bMed.status === 'Apte' || bMed.status === 'Guéri / Feu vert') {
+    mappedStatus = 'Guéri / Feu vert';
+  } else if (bMed.status === 'Apte avec réserve') {
+    mappedStatus = 'Apte avec réserve';
+  } else {
+    mappedStatus = 'Indisponible';
+  }
 
   return {
     id: String(bMed.id),
@@ -52,10 +63,10 @@ export function mapBackendMedicalRecordToFrontend(bMed: BackendMedicalRecord): M
  * Convertit un dossier médical Frontend vers le format backend Django JSON
  */
 export function mapFrontendMedicalRecordToBackend(med: Partial<MedicalRecord>, memberId = 1, clubId = 1): BackendMedicalRecord {
-  let backendStatus = 'En soins';
-  if (med.status === 'Indisponible') backendStatus = 'Indisponible';
+  let backendStatus = 'Indisponible';
+  if (med.status === 'Indisponible' || med.status === 'En soins') backendStatus = 'Indisponible';
   else if (med.status === 'Réathlétisation') backendStatus = 'Réathlétisation';
-  else if (med.status === 'Guéri / Feu vert' || med.status === 'Apte avec réserve') backendStatus = 'Apte';
+  else if (med.status === 'Guéri / Feu vert' || med.status === 'Apte avec réserve' || med.status === 'Apte') backendStatus = 'Apte';
 
   const numericMemberId = Number(med.playerId) || memberId || 1;
 

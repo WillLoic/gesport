@@ -10,6 +10,8 @@ import {
   Clock,
   FileText,
   X,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { MedicalRecord } from '../../types';
@@ -19,24 +21,79 @@ export const MedicalView: React.FC = () => {
   const { medicalRecords, setMedicalRecords, members, teams, showToast } = useClub();
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(medicalRecords[0] || null);
   const [isNewInjuryModalOpen, setIsNewInjuryModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<MedicalRecord | null>(null);
 
   // Sync selected record when medicalRecords change
   useEffect(() => {
     if (medicalRecords.length > 0 && (!selectedRecord || !medicalRecords.some(r => r.id === selectedRecord.id))) {
       setSelectedRecord(medicalRecords[0]);
+    } else if (medicalRecords.length === 0) {
+      setSelectedRecord(null);
     }
   }, [medicalRecords]);
 
-  // New Injury Form State
-  const [newMemberId, setNewMemberId] = useState(members[0]?.id || 'm1');
-  const [newInjuryType, setNewInjuryType] = useState('Entorse cheville droite (Stade 2)');
+  // Derived selected team name
+  const selectedMember = selectedRecord ? members.find(m => String(m.id) === String(selectedRecord.playerId)) : null;
+  const selectedTeamName = selectedMember?.teamName && selectedMember.teamName !== 'Sans équipe'
+    ? selectedMember.teamName
+    : (selectedRecord?.teamName && selectedRecord.teamName !== 'Équipe 1' ? selectedRecord.teamName : 'Sans équipe');
+
+  // Form State (empty defaults by default)
+  const [newMemberId, setNewMemberId] = useState(members[0]?.id || '1');
+  const [newInjuryType, setNewInjuryType] = useState('');
   const [newInjuryDate, setNewInjuryDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newEstimatedReturnDate, setNewEstimatedReturnDate] = useState(
-    new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
+  const [newEstimatedReturnDate, setNewEstimatedReturnDate] = useState('');
   const [newStatus, setNewStatus] = useState<'Indisponible' | 'Réathlétisation' | 'Apte avec réserve'>('Indisponible');
-  const [newPractitioner, setNewPractitioner] = useState('Dr. Thomas Clairet (Médecin du Club)');
-  const [newProtocol, setNewProtocol] = useState('Protocole RICE immédiat (Repos, Glaçage, Compression, Élévation), 10 séances de kiné proprioception et reprise progressive sur terrain.');
+  const [newPractitioner, setNewPractitioner] = useState('');
+  const [newProtocol, setNewProtocol] = useState('');
+
+  const openCreateModal = () => {
+    setEditingRecord(null);
+    setNewMemberId(members[0]?.id || '1');
+    setNewInjuryType('');
+    setNewInjuryDate(new Date().toISOString().split('T')[0]);
+    setNewEstimatedReturnDate('');
+    setNewStatus('Indisponible');
+    setNewPractitioner('');
+    setNewProtocol('');
+    setIsNewInjuryModalOpen(true);
+  };
+
+  const openEditModal = (record: MedicalRecord, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingRecord(record);
+    setNewMemberId(record.playerId || members[0]?.id || '1');
+    setNewInjuryType(record.injuryType || '');
+    setNewInjuryDate(record.injuryDate || new Date().toISOString().split('T')[0]);
+    setNewEstimatedReturnDate(record.estimatedReturnDate || '');
+    setNewStatus((record.status === 'Guéri / Feu vert' ? 'Apte avec réserve' : record.status) as any);
+    setNewPractitioner('');
+    setNewProtocol(record.physioNotes || record.prescribedCare || '');
+    setIsNewInjuryModalOpen(true);
+  };
+
+  const handleDeleteInjury = async (recordId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const recordToDelete = medicalRecords.find(r => r.id === recordId);
+    if (!recordToDelete) return;
+
+    if (!window.confirm(`Voulez-vous vraiment supprimer le dossier médical de "${recordToDelete.playerName}" ?`)) {
+      return;
+    }
+
+    try {
+      await medicalService.deleteMedicalRecord(recordId);
+    } catch (err) {
+      console.warn('Erreur suppression dossier médical:', err);
+    }
+
+    setMedicalRecords(prev => prev.filter(r => r.id !== recordId));
+    if (selectedRecord?.id === recordId) {
+      const remaining = medicalRecords.filter(r => r.id !== recordId);
+      setSelectedRecord(remaining[0] || null);
+    }
+    showToast(`Dossier médical de "${recordToDelete.playerName}" supprimé !`);
+  };
 
   const handleUpdateStatus = async (recordId: string, status: any) => {
     const recordToUpdate = medicalRecords.find(r => r.id === recordId);
@@ -64,43 +121,67 @@ export const MedicalView: React.FC = () => {
     }
   };
 
-  const handleCreateInjury = async (e: React.FormEvent) => {
+  const handleSaveInjury = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newInjuryType.trim()) {
+      showToast('Veuillez renseigner le diagnostic / type de blessure.');
+      return;
+    }
+
+    const notesText = newPractitioner.trim()
+      ? `${newProtocol.trim()} — Suivi par : ${newPractitioner.trim()}`
+      : newProtocol.trim();
+
     const targetMember = members.find(m => m.id === newMemberId) || members[0];
-    const targetTeam = teams.find(t => t.id === targetMember?.teamId) || teams[0];
+    const targetTeam = targetMember ? teams.find(t => t.id === targetMember.teamId) : null;
+    const memberTeamName = targetTeam ? targetTeam.name : (targetMember?.teamName || 'Sans équipe');
 
     const recordPayload: Partial<MedicalRecord> = {
       playerId: targetMember ? targetMember.id : '1',
       playerName: targetMember ? `${targetMember.firstName} ${targetMember.lastName}` : 'Licencié',
-      teamName: targetTeam ? targetTeam.name : 'Équipe 1',
-      injuryType: newInjuryType.trim() || 'Lésion musculaire',
+      teamName: memberTeamName,
+      injuryType: newInjuryType.trim(),
       bodyPart: 'Membre inférieur',
       severity: 'Modérée (1-4 sem)',
       injuryDate: newInjuryDate,
       estimatedReturnDate: newEstimatedReturnDate,
       status: newStatus as any,
-      physioNotes: `${newProtocol.trim()} — Suivi par : ${newPractitioner.trim()}`,
-      prescribedCare: newProtocol.trim() || 'Repos et soins kiné',
-      doctorCleared: false,
+      physioNotes: notesText,
+      prescribedCare: newProtocol.trim(),
+      doctorCleared: newStatus === 'Guéri / Feu vert',
     };
 
-    try {
-      const createdRecord = await medicalService.createMedicalRecord(recordPayload, 1);
-      setMedicalRecords(prev => [createdRecord, ...prev]);
-      setSelectedRecord(createdRecord);
-      showToast(`Dossier médical créé pour ${createdRecord.playerName} (${createdRecord.injuryType}) !`);
-    } catch (err) {
-      const fallbackRecord: MedicalRecord = {
-        id: `med-${Date.now()}`,
-        ...recordPayload,
-      } as MedicalRecord;
-      setMedicalRecords(prev => [fallbackRecord, ...prev]);
-      setSelectedRecord(fallbackRecord);
-      showToast(`Dossier médical créé pour ${fallbackRecord.playerName} !`);
+    if (editingRecord) {
+      try {
+        const updated = await medicalService.updateMedicalRecord(editingRecord.id, recordPayload);
+        setMedicalRecords(prev => prev.map(r => r.id === editingRecord.id ? updated : r));
+        setSelectedRecord(updated);
+        showToast(`Dossier médical de ${updated.playerName} mis à jour !`);
+      } catch (err) {
+        const updatedLocal = { ...editingRecord, ...recordPayload } as MedicalRecord;
+        setMedicalRecords(prev => prev.map(r => r.id === editingRecord.id ? updatedLocal : r));
+        setSelectedRecord(updatedLocal);
+        showToast(`Dossier médical mis à jour !`);
+      }
+    } else {
+      try {
+        const createdRecord = await medicalService.createMedicalRecord(recordPayload, 1);
+        setMedicalRecords(prev => [createdRecord, ...prev]);
+        setSelectedRecord(createdRecord);
+        showToast(`Dossier médical créé pour ${createdRecord.playerName} (${createdRecord.injuryType}) !`);
+      } catch (err) {
+        const fallbackRecord: MedicalRecord = {
+          id: `med-${Date.now()}`,
+          ...recordPayload,
+        } as MedicalRecord;
+        setMedicalRecords(prev => [fallbackRecord, ...prev]);
+        setSelectedRecord(fallbackRecord);
+        showToast(`Dossier médical créé pour ${fallbackRecord.playerName} !`);
+      }
     }
 
     setIsNewInjuryModalOpen(false);
-    setNewInjuryType('Entorse cheville');
+    setEditingRecord(null);
   };
 
   return (
@@ -116,7 +197,7 @@ export const MedicalView: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setIsNewInjuryModalOpen(true)}
+          onClick={openCreateModal}
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs cursor-pointer transition-all"
         >
           <Plus className="w-4 h-4" />
@@ -168,6 +249,11 @@ export const MedicalView: React.FC = () => {
               ) : (
                 medicalRecords.map(record => {
                   const isSelected = selectedRecord?.id === record.id;
+                  const memberObj = members.find(m => String(m.id) === String(record.playerId));
+                  const displayTeamName = memberObj?.teamName && memberObj.teamName !== 'Sans équipe'
+                    ? memberObj.teamName
+                    : (record.teamName && record.teamName !== 'Équipe 1' ? record.teamName : 'Sans équipe');
+
                   return (
                     <div
                       key={record.id}
@@ -183,11 +269,11 @@ export const MedicalView: React.FC = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-sm text-slate-900">{record.playerName}</h4>
-                            <span className="text-xs text-slate-400">({record.teamName})</span>
+                            <span className="text-xs text-slate-400">({displayTeamName})</span>
                           </div>
                           <p className="text-xs font-semibold text-rose-700 mt-0.5">{record.injuryType}</p>
                           <p className="text-[11px] text-slate-400">
-                            Date blessure : {record.injuryDate} • Retour estimé : {record.estimatedReturnDate}
+                            Date blessure : {record.injuryDate} {record.estimatedReturnDate ? `• Retour estimé : ${record.estimatedReturnDate}` : ''}
                           </p>
                         </div>
                       </div>
@@ -204,6 +290,26 @@ export const MedicalView: React.FC = () => {
                         >
                           {record.status}
                         </span>
+
+                        {/* Edit & Delete Action Icons */}
+                        <div className="flex items-center gap-1 ml-2">
+                          <button
+                            type="button"
+                            onClick={(e) => openEditModal(record, e)}
+                            title="Modifier le dossier médical"
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteInjury(record.id, e)}
+                            title="Supprimer le dossier médical"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -217,10 +323,31 @@ export const MedicalView: React.FC = () => {
         <div>
           {selectedRecord ? (
             <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-6 sticky top-24">
-              <div className="border-b border-slate-100 pb-4">
-                <span className="text-xs font-bold uppercase text-rose-600 tracking-wider">Fiche de Soins</span>
-                <h3 className="font-bold text-lg text-slate-900 mt-1">{selectedRecord.playerName}</h3>
-                <p className="text-xs text-slate-500">{selectedRecord.teamName}</p>
+              <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold uppercase text-rose-600 tracking-wider">Fiche de Soins</span>
+                  <h3 className="font-bold text-lg text-slate-900 mt-1">{selectedRecord.playerName}</h3>
+                  <p className="text-xs text-slate-500">{selectedTeamName}</p>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={(e) => openEditModal(selectedRecord, e)}
+                    title="Modifier"
+                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteInjury(selectedRecord.id, e)}
+                    title="Supprimer"
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
@@ -232,10 +359,12 @@ export const MedicalView: React.FC = () => {
                   <span className="text-slate-500">Date de survenue :</span>
                   <span className="font-semibold text-slate-800">{selectedRecord.injuryDate}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Date estimée de reprise :</span>
-                  <span className="font-bold text-slate-900">{selectedRecord.estimatedReturnDate}</span>
-                </div>
+                {selectedRecord.estimatedReturnDate && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Date estimée de reprise :</span>
+                    <span className="font-bold text-slate-900">{selectedRecord.estimatedReturnDate}</span>
+                  </div>
+                )}
               </div>
 
               {/* Protocol */}
@@ -244,7 +373,9 @@ export const MedicalView: React.FC = () => {
                   <Activity className="w-4 h-4 text-blue-600" />
                   Protocole & Recommandations Kiné
                 </h4>
-                <p className="text-xs text-slate-700 leading-relaxed">{selectedRecord.protocol}</p>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {selectedRecord.physioNotes || selectedRecord.prescribedCare || 'Aucun protocole saisi.'}
+                </p>
               </div>
 
               {/* Status change actions */}
@@ -254,21 +385,21 @@ export const MedicalView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleUpdateStatus(selectedRecord.id, 'Indisponible')}
-                    className="p-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                    className="p-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 cursor-pointer transition-colors"
                   >
                     Indisponible
                   </button>
                   <button
                     type="button"
                     onClick={() => handleUpdateStatus(selectedRecord.id, 'Réathlétisation')}
-                    className="p-2 text-xs font-bold rounded-xl bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                    className="p-2 text-xs font-bold rounded-xl bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 cursor-pointer transition-colors"
                   >
                     Réathlétisation
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus(selectedRecord.id, 'Apte')}
-                    className="p-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                    onClick={() => handleUpdateStatus(selectedRecord.id, 'Guéri / Feu vert')}
+                    className="p-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 cursor-pointer transition-colors"
                   >
                     Feu Vert (Apte)
                   </button>
@@ -283,7 +414,7 @@ export const MedicalView: React.FC = () => {
         </div>
       </div>
 
-      {/* New Medical Injury Record Modal */}
+      {/* New / Edit Medical Injury Record Modal */}
       {isNewInjuryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-6 my-8 animate-in fade-in zoom-in-95 duration-150">
@@ -293,20 +424,25 @@ export const MedicalView: React.FC = () => {
                   <HeartPulse className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-slate-900 font-display">Déclaration de Blessure / Soin</h3>
+                  <h3 className="font-bold text-lg text-slate-900 font-display">
+                    {editingRecord ? 'Modifier le Dossier Médical' : 'Déclaration de Blessure / Soin'}
+                  </h3>
                   <p className="text-xs text-slate-500">Ouverture d'un dossier médical et protocole de réathlétisation</p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsNewInjuryModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors"
+                onClick={() => {
+                  setIsNewInjuryModalOpen(false);
+                  setEditingRecord(null);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateInjury} className="space-y-4">
+            <form onSubmit={handleSaveInjury} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -377,6 +513,7 @@ export const MedicalView: React.FC = () => {
                     <option value="Indisponible">Indisponible (Arrêt complet)</option>
                     <option value="Réathlétisation">En Réathlétisation</option>
                     <option value="Apte avec réserve">Apte avec réserve</option>
+                    <option value="Guéri / Feu vert">Guéri / Feu vert</option>
                   </select>
                 </div>
               </div>
@@ -400,7 +537,7 @@ export const MedicalView: React.FC = () => {
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Séances de physiothérapie, glaçage, renforcement excentrique..."
+                  placeholder="Ex: Séances de physiothérapie, glaçage, renforcement excentrique..."
                   value={newProtocol}
                   onChange={e => setNewProtocol(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -410,16 +547,19 @@ export const MedicalView: React.FC = () => {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsNewInjuryModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  onClick={() => {
+                    setIsNewInjuryModalOpen(false);
+                    setEditingRecord(null);
+                  }}
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-colors cursor-pointer"
                 >
-                  Enregistrer le Dossier Médical
+                  {editingRecord ? 'Mettre à jour le Dossier' : 'Enregistrer le Dossier Médical'}
                 </button>
               </div>
             </form>
