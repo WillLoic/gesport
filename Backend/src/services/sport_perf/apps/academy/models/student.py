@@ -14,9 +14,12 @@ class AcademyStudent(models.Model):
     grade_level = models.CharField(max_length=50, verbose_name="Classe / Niveau (ex: 3ème, Terminale)")
     academic_gpa = models.FloatField(default=14.0, verbose_name="Moyenne générale (/20)")
 
-    tutor_name = models.CharField(max_length=100, blank=True, default='', verbose_name="Nom du tuteur / Référent")
+    age = models.IntegerField(default=16, null=True, blank=True, verbose_name="Âge")
+    parents_name = models.CharField(max_length=150, blank=True, default='', verbose_name="Nom des parents / tuteurs légaux")
+    tutor_name = models.CharField(max_length=100, blank=True, default='', verbose_name="Nom du coach tuteur référent")
     tutor_phone = models.CharField(max_length=20, blank=True, default='', verbose_name="Téléphone du tuteur")
 
+    school_support_needed = models.BooleanField(default=False, verbose_name="Soutien scolaire requis")
     observations = models.TextField(blank=True, default='', verbose_name="Bilan comportemental & sportif")
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -12,6 +12,7 @@ class AcademyStudentSerializer(serializers.ModelSerializer):
         model = AcademyStudent
         fields = [
             'id', 'member', 'member_id', 'member_detail', 'school_name', 'grade_level',
-            'academic_gpa', 'tutor_name', 'tutor_phone', 'observations', 'created_at',
+            'academic_gpa', 'age', 'parents_name', 'tutor_name', 'tutor_phone',
+            'school_support_needed', 'observations', 'created_at',
         ]
 
