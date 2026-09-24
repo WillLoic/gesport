@@ -36,8 +36,12 @@ class TalentProspect(models.Model):
 
     overall_rating = models.FloatField(default=7.5, verbose_name="Note globale (/10)")
     radar_scores_json = models.JSONField(default=dict, verbose_name="Radar de compétences par critère")
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='Supervisé')
+    status = models.CharField(max_length=50, default='Prospecté')
     scout_notes = models.TextField(blank=True, default='', verbose_name="Rapport du recruteur")
+    height_cm = models.IntegerField(default=185, null=True, blank=True, verbose_name="Taille en cm")
+    category_target = models.CharField(max_length=100, default='Sénior R1', blank=True, verbose_name="Catégorie visée")
+    contact_phone = models.CharField(max_length=50, blank=True, default='', verbose_name="Téléphone contact")
+    trial_date = models.CharField(max_length=50, blank=True, default='', verbose_name="Date d'essai")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

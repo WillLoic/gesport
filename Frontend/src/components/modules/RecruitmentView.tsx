@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UserCheck,
   Plus,
@@ -10,11 +10,18 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { TalentCandidate } from '../../types';
+import { recruitmentService } from '../../services/recruitmentService';
 
 export const RecruitmentView: React.FC = () => {
   const { talents, setTalents, currentSportConfig, showToast } = useClub();
   const [selectedCandidate, setSelectedCandidate] = useState<TalentCandidate | null>(talents[0] || null);
   const [isNewProspectModalOpen, setIsNewProspectModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (talents.length > 0 && (!selectedCandidate || !talents.some(t => t.id === selectedCandidate.id))) {
+      setSelectedCandidate(talents[0]);
+    }
+  }, [talents]);
 
   // New Prospect Form State
   const [newFullName, setNewFullName] = useState('');
@@ -40,24 +47,36 @@ export const RecruitmentView: React.FC = () => {
     'Refusé',
   ];
 
-  const handleUpdateStage = (candidateId: string, newStage: any) => {
+  const handleUpdateStage = async (candidateId: string, newStage: any) => {
+    const candidate = talents.find(c => c.id === candidateId);
+    if (!candidate) return;
+
+    const updatedCandidate: TalentCandidate = { ...candidate, stage: newStage };
+
     setTalents(prev =>
-      prev.map(c => (c.id === candidateId ? { ...c, stage: newStage } : c))
+      prev.map(c => (c.id === candidateId ? updatedCandidate : c))
     );
     if (selectedCandidate && selectedCandidate.id === candidateId) {
-      setSelectedCandidate(prev => (prev ? { ...prev, stage: newStage } : null));
+      setSelectedCandidate(updatedCandidate);
     }
-    showToast(`Statut de recrutement actualisé : ${newStage}`);
+
+    try {
+      await recruitmentService.createOrUpdateProspect(updatedCandidate);
+      showToast(`Statut de recrutement actualisé : ${newStage}`);
+    } catch (err) {
+      console.error('Erreur mise à jour prospect:', err);
+      showToast(`Statut actualisé en local : ${newStage}`);
+    }
   };
 
-  const handleCreateProspect = (e: React.FormEvent) => {
+  const handleCreateProspect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFullName.trim()) {
       showToast('Veuillez renseigner le nom complet de la recrue.');
       return;
     }
 
-    const newCandidate: TalentCandidate = {
+    const tempCandidate: TalentCandidate = {
       id: `talent-${Date.now()}`,
       fullName: newFullName.trim(),
       position: newPosition,
@@ -78,10 +97,19 @@ export const RecruitmentView: React.FC = () => {
       },
     };
 
-    setTalents(prev => [newCandidate, ...prev]);
-    setSelectedCandidate(newCandidate);
+    try {
+      const savedCandidate = await recruitmentService.createOrUpdateProspect(tempCandidate);
+      setTalents(prev => [savedCandidate, ...prev]);
+      setSelectedCandidate(savedCandidate);
+      showToast(`Prospect ${savedCandidate.fullName} enregistré en base de données !`);
+    } catch (err) {
+      console.error('Erreur création prospect backend:', err);
+      setTalents(prev => [tempCandidate, ...prev]);
+      setSelectedCandidate(tempCandidate);
+      showToast(`Prospect ${tempCandidate.fullName} ajouté en local.`);
+    }
+
     setIsNewProspectModalOpen(false);
-    showToast(`Prospect ${newCandidate.fullName} ajouté à la cellule de recrutement !`);
 
     // Reset Form
     setNewFullName('');

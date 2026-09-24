@@ -41,6 +41,7 @@ import { competitionService } from '../services/competitionService';
 import { tacticsService } from '../services/tacticsService';
 import { medicalService } from '../services/medicalService';
 import { academyService } from '../services/academyService';
+import { recruitmentService } from '../services/recruitmentService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -329,10 +330,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : INITIAL_TICKETS;
   });
 
-  const [talents, setTalents] = useState<TalentCandidate[]>(() => {
-    const saved = localStorage.getItem('sportflow_talents');
-    return saved ? JSON.parse(saved) : INITIAL_TALENTS;
-  });
+  // Prospects / Recrues synchronisés avec le microservice backend (sport_perf / recruitment)
+  const [talents, setTalents] = useState<TalentCandidate[]>([]);
 
   // Élèves Académie synchronisés uniquement avec le microservice backend (sport_perf / academy)
   const [academy, setAcademy] = useState<AcademyStudent[]>([]);
@@ -443,6 +442,19 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((err) => {
         console.warn('Microservice sport_perf (academy) non disponible:', err);
         setAcademy([]);
+      });
+  }, []);
+
+  // Chargement initial des recrues/prospects depuis le microservice backend (sport_perf / recruitment)
+  useEffect(() => {
+    recruitmentService
+      .getProspects(1)
+      .then((remoteProspects) => {
+        setTalents(remoteProspects || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (recruitment) non disponible:', err);
+        setTalents([]);
       });
   }, []);
 

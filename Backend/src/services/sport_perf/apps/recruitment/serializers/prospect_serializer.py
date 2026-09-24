@@ -7,5 +7,6 @@ class TalentProspectSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club_id', 'first_name', 'last_name', 'birth_year', 'sport_type',
             'position', 'current_club', 'overall_rating', 'radar_scores_json',
-            'status', 'scout_notes', 'created_at',
+            'status', 'scout_notes', 'created_at', 'height_cm', 'category_target',
+            'contact_phone', 'trial_date',
         ]

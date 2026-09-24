@@ -26,6 +26,13 @@ class ProspectListCreateView(APIView):
 class ProspectDetailView(APIView):
     permission_classes = [AllowAny]
 
+    def get(self, request: Request, pk: int) -> Response:
+        try:
+            prospect = TalentProspect.objects.get(pk=pk)
+            return Response(TalentProspectSerializer(prospect).data)
+        except TalentProspect.DoesNotExist:
+            return Response({"detail": "Prospect introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
     def put(self, request: Request, pk: int) -> Response:
         try:
             prospect = TalentProspect.objects.get(pk=pk)
@@ -36,3 +43,11 @@ class ProspectDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         prospect = update_prospect(prospect=prospect, **serializer.validated_data)
         return Response(TalentProspectSerializer(prospect).data, status=status.HTTP_200_OK)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        try:
+            prospect = TalentProspect.objects.get(pk=pk)
+            prospect.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except TalentProspect.DoesNotExist:
+            return Response({"detail": "Prospect introuvable."}, status=status.HTTP_404_NOT_FOUND)
