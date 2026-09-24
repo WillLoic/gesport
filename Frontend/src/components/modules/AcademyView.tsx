@@ -10,6 +10,10 @@ import {
   User,
   Pencil,
   Trash2,
+  FileText,
+  ShieldAlert,
+  CheckCircle2,
+  Users,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { AcademyStudent } from '../../types';
@@ -44,13 +48,28 @@ export const AcademyView: React.FC = () => {
     }
   }, [academy]);
 
+  const getStudentTeamName = (student: AcademyStudent) => {
+    const foundMember = members.find(m => String(m.id) === String(student.memberId));
+    return foundMember?.teamName || 'Sans équipe';
+  };
+
+  const getStudentAge = (student: AcademyStudent) => {
+    if (student.age && student.age > 0) return student.age;
+    const member = members.find(m => String(m.id) === String(student.memberId));
+    if (member?.birthDate) {
+      const birthYear = new Date(member.birthDate).getFullYear();
+      if (!isNaN(birthYear)) return new Date().getFullYear() - birthYear;
+    }
+    return 16;
+  };
+
   const handleOpenCreateModal = () => {
     setEditingStudent(null);
     const defaultMember = members[0];
     setSelectedMemberId(defaultMember ? defaultMember.id : '');
     setNewName(defaultMember ? `${defaultMember.firstName} ${defaultMember.lastName}` : '');
     setNewCategory(defaultMember?.category || 'U18 Espoirs');
-    setNewAge('');
+    setNewAge(16);
     setNewSchoolGrade('');
     setNewParentsName('');
     setNewParentsPhone('');
@@ -62,10 +81,14 @@ export const AcademyView: React.FC = () => {
 
   const handleMemberSelect = (memberId: string) => {
     setSelectedMemberId(memberId);
-    const found = members.find(m => m.id === memberId);
+    const found = members.find(m => String(m.id) === String(memberId));
     if (found) {
       setNewName(`${found.firstName} ${found.lastName}`);
       if (found.category) setNewCategory(found.category);
+      if (found.birthDate) {
+        const birthYear = new Date(found.birthDate).getFullYear();
+        if (!isNaN(birthYear)) setNewAge(new Date().getFullYear() - birthYear);
+      }
     }
   };
 
@@ -75,7 +98,7 @@ export const AcademyView: React.FC = () => {
     setSelectedMemberId(student.memberId || (members[0] ? members[0].id : ''));
     setNewName(student.studentName);
     setNewCategory(student.category);
-    setNewAge(student.age || '');
+    setNewAge(getStudentAge(student));
     setNewSchoolGrade(student.schoolGrade || '');
     setNewParentsName(student.parentsName || '');
     setNewParentsPhone(student.parentsPhone || '');
@@ -113,13 +136,13 @@ export const AcademyView: React.FC = () => {
       memberId: selectedMemberId,
       studentName: newName.trim(),
       category: newCategory as any,
-      age: Number(newAge) || 16,
+      age: typeof newAge === 'number' && newAge > 0 ? newAge : 16,
       schoolGrade: newSchoolGrade.trim() || 'Niveau non précisé',
       parentsName: newParentsName.trim() || 'Parents Référents',
       parentsPhone: newParentsPhone.trim() || '',
-      tutorCoachName: newTutorCoach.trim() || 'Coach Tuteur',
+      tutorCoachName: newTutorCoach.trim() || 'Non assigné',
       schoolSupportNeeded: newSchoolSupport,
-      coachComments: newCoachComments.trim(),
+      coachComments: newCoachComments.trim() || 'Aucune observation enregistrée.',
     };
 
     try {
@@ -136,6 +159,148 @@ export const AcademyView: React.FC = () => {
     } catch (err) {
       showToast('Erreur lors de l\'enregistrement.');
     }
+  };
+
+  const handleGenerateBulletinPDF = (student: AcademyStudent) => {
+    const teamName = getStudentTeamName(student);
+    const age = getStudentAge(student);
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      showToast('Veuillez autoriser les pop-ups pour imprimer le bulletin.');
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <title>Bulletin Trimestriel - ${student.studentName}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #0f172a; background: #ffffff; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo-title h1 { margin: 0; font-size: 24px; color: #1e293b; text-transform: uppercase; letter-spacing: 1px; }
+          .logo-title p { margin: 5px 0 0 0; color: #2563eb; font-weight: bold; font-size: 13px; }
+          .season-badge { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 6px 14px; font-weight: bold; font-size: 12px; border-radius: 20px; text-transform: uppercase; }
+          
+          .section { margin-bottom: 25px; }
+          .section-title { font-size: 13px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; }
+          
+          .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+          .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          
+          .card { background: #f8fafc; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; }
+          .card label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 3px; }
+          .card val { font-size: 14px; font-weight: 600; color: #0f172a; }
+
+          .status-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+          .status-ok { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+          .status-warn { background: #ffe4e6; color: #be123c; border: 1px solid #fecdd3; }
+
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+          th { background: #f1f5f9; color: #334155; font-weight: 700; text-transform: uppercase; font-size: 11px; }
+          .score { font-weight: bold; color: #2563eb; font-size: 14px; }
+
+          .obs-box { background: #fafafa; border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; padding: 15px; border-radius: 6px; font-size: 13px; line-height: 1.6; color: #334155; }
+
+          .signatures { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+          .sig-block { width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 10px; font-size: 12px; font-weight: bold; color: #64748b; }
+          
+          @media print {
+            .no-print { display: none !blank; }
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo-title">
+            <h1>GESPORT - ACADÉMIE SPORT-ÉTUDES</h1>
+            <p>Bulletin Trimestriel d'Évaluation & Suivi de l'Académicien</p>
+          </div>
+          <div class="season-badge">Saison 2025 - 2026</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Profil & Informations Générales</div>
+          <div class="grid-3">
+            <div class="card"><label>Nom & Prénom</label><val>${student.studentName}</val></div>
+            <div class="card"><label>Âge & Catégorie</label><val>${age} ans (${student.category})</val></div>
+            <div class="card"><label>Équipe du Joueur</label><val>${teamName}</val></div>
+            <div class="card"><label>Scolarité / Établissement</label><val>${student.schoolGrade}</val></div>
+            <div class="card"><label>Parent / Tuteur Légal</label><val>${student.parentsName} (${student.parentsPhone || 'Tél N/C'})</val></div>
+            <div class="card"><label>Entraîneur Tuteur Référent</label><val>${student.tutorCoachName}</val></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Bilan Scolaire & Sportif (Observations)</div>
+          <div class="card" style="margin-bottom: 12px;">
+            <label>Statut d'Accompagnement Scolaire</label>
+            <div style="margin-top: 5px;">
+              ${
+                student.schoolSupportNeeded
+                  ? '<span class="status-badge status-warn">⚠️ Besoins de soutien scolaire identifiés</span>'
+                  : '<span class="status-badge status-ok">✓ Scolarité OK — Pas de problème scolaire</span>'
+              }
+            </div>
+          </div>
+          <div class="obs-box">
+            <strong>Bilan & Appréciation de l'Entraîneur / Référent :</strong><br/>
+            ${student.coachComments || 'Aucune observation complémentaire.'}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Bilan des Évaluations (/20)</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Trimestre / Période</th>
+                <th>Technique</th>
+                <th>Tactique</th>
+                <th>Athlétique</th>
+                <th>Attitude / Esprit</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(student.progressScores || [])
+                .map(
+                  score => `
+                <tr>
+                  <td><strong>${score.quarter}</strong></td>
+                  <td class="score">${score.technicalScore}/20</td>
+                  <td class="score">${score.tacticalScore}/20</td>
+                  <td class="score">${score.athleticScore}/20</td>
+                  <td class="score">${score.attitudeScore}/20</td>
+                </tr>
+              `
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="signatures">
+          <div class="sig-block">Visa & Signature des Parents / Tuteur</div>
+          <div class="sig-block">Signature du Directeur de l'Académie</div>
+        </div>
+
+        <div class="no-print" style="margin-top: 30px; text-align: center;">
+          <button onclick="window.print()" style="padding: 12px 28px; background: #2563eb; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(37,99,235,0.3);">
+            🖨️ Imprimer ou Télécharger le Bulletin (PDF)
+          </button>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    showToast(`Bulletin trimestriel généré pour ${student.studentName}.`);
   };
 
   return (
@@ -183,6 +348,9 @@ export const AcademyView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {academy.map(student => {
                 const isSelected = selectedStudent?.id === student.id;
+                const teamName = getStudentTeamName(student);
+                const age = getStudentAge(student);
+
                 return (
                   <div
                     key={student.id}
@@ -194,9 +362,14 @@ export const AcademyView: React.FC = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h3 className="font-bold text-base text-slate-900">{student.studentName}</h3>
-                        <p className="text-xs text-slate-500">
-                          {student.category} • {student.age} ans • Classe : {student.schoolGrade}
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {student.category} • <span className="font-semibold text-slate-700">{age} ans</span> • Classe : {student.schoolGrade}
                         </p>
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                            <Users className="w-3 h-3 text-slate-400" /> Équipe : <strong className="text-blue-700">{teamName}</strong>
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1">
@@ -219,25 +392,31 @@ export const AcademyView: React.FC = () => {
                       </div>
                     </div>
 
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 inline-block">
-                      Tuteur : {student.tutorCoachName}
-                    </span>
+                    <div className="space-y-1 text-xs">
+                      <div className="text-slate-600">
+                        <span className="font-bold text-slate-500">Parent :</span> {student.parentsName}
+                      </div>
+                      <div className="text-slate-600">
+                        <span className="font-bold text-blue-600">Entraîneur Tuteur :</span> {student.tutorCoachName}
+                      </div>
+                    </div>
 
-                    <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
-                      "{student.coachComments}"
-                    </p>
+                    <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="font-bold text-slate-700 block mb-0.5">Bilan & Observations :</span>
+                      <p className="line-clamp-2 italic">"{student.coachComments}"</p>
+                    </div>
 
                     <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
                       <span className="flex items-center gap-1 text-slate-500">
                         <Phone className="w-3.5 h-3.5 text-slate-400" /> {student.parentsPhone || 'Non renseigné'}
                       </span>
                       {student.schoolSupportNeeded ? (
-                        <span className="text-rose-600 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded">
-                          Soutien requis
+                        <span className="text-rose-600 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3" /> Soutien requis
                         </span>
                       ) : (
-                        <span className="text-emerald-600 font-semibold text-[11px] bg-emerald-50 px-2 py-0.5 rounded">
-                          Scolarité OK
+                        <span className="text-emerald-600 font-semibold text-[11px] bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Scolarité OK
                         </span>
                       )}
                     </div>
@@ -259,17 +438,48 @@ export const AcademyView: React.FC = () => {
                     {selectedStudent.category}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Classe : {selectedStudent.schoolGrade} • Parents : {selectedStudent.parentsName}
+                <div className="mt-1 space-y-1 text-xs text-slate-500">
+                  <p>
+                    <strong className="text-slate-700">Âge :</strong> {getStudentAge(selectedStudent)} ans • <strong className="text-slate-700">Équipe :</strong>{' '}
+                    <span className="text-blue-700 font-bold">{getStudentTeamName(selectedStudent)}</span>
+                  </p>
+                  <p>Classe : {selectedStudent.schoolGrade}</p>
+                  <p>
+                    <strong className="text-slate-700">Parent :</strong> {selectedStudent.parentsName}
+                  </p>
+                  <p>
+                    <strong className="text-blue-600">Entraîneur Tuteur Référent :</strong> {selectedStudent.tutorCoachName}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bilan Scolaire & Sportif Section */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Bilan Scolaire & Sportif
+                  </span>
+                  {selectedStudent.schoolSupportNeeded ? (
+                    <span className="text-rose-700 bg-rose-100 text-[11px] font-bold px-2 py-0.5 rounded">
+                      Soutien Requis
+                    </span>
+                  ) : (
+                    <span className="text-emerald-700 bg-emerald-100 text-[11px] font-bold px-2 py-0.5 rounded">
+                      Scolarité OK
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-700 bg-white p-3 rounded-lg border border-slate-200 italic leading-relaxed">
+                  "{selectedStudent.coachComments || 'Aucune observation renseignée.'}"
                 </p>
               </div>
 
               {/* Progress Scores Breakdown */}
               <div className="space-y-3">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                  Bilan Trimestriel Sport & Scolaire (/20)
+                  Évaluations Trimestrielles (/20)
                 </span>
-                {selectedStudent.progressScores.map((score, i) => (
+                {(selectedStudent.progressScores || []).map((score, i) => (
                   <div key={i} className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-2">
                     <div className="font-bold text-blue-700">{score.quarter}</div>
                     <div className="grid grid-cols-2 gap-2 text-slate-700 font-medium">
@@ -284,9 +494,10 @@ export const AcademyView: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => showToast(`Bilan complet généré pour les parents de ${selectedStudent.studentName}.`)}
-                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs cursor-pointer transition-colors"
+                onClick={() => handleGenerateBulletinPDF(selectedStudent)}
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs cursor-pointer transition-colors flex items-center justify-center gap-2"
               >
+                <FileText className="w-4 h-4" />
                 Générer Bulletin Trimestriel PDF
               </button>
             </div>
@@ -336,7 +547,7 @@ export const AcademyView: React.FC = () => {
                   {members.length === 0 && <option value="">Aucun membre disponible en base</option>}
                   {members.map(m => (
                     <option key={m.id} value={m.id}>
-                      {m.firstName} {m.lastName} ({m.category} - {m.teamName})
+                      {m.firstName} {m.lastName} ({m.category} - Équipe: {m.teamName || 'Sans équipe'})
                     </option>
                   ))}
                 </select>
@@ -369,6 +580,7 @@ export const AcademyView: React.FC = () => {
                     <option value="U13 Pépinière">U13 Pépinière</option>
                     <option value="U15 Espoirs">U15 Espoirs</option>
                     <option value="U18 Espoirs">U18 Espoirs</option>
+                    <option value="Senior Régionale">Senior Régionale</option>
                     <option value="Centre de Formation Pro">Centre de Formation Pro</option>
                   </select>
                 </div>
@@ -377,16 +589,17 @@ export const AcademyView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Âge (ans)
+                    Âge (ans) *
                   </label>
                   <input
                     type="number"
-                    min={10}
-                    max={23}
+                    min={8}
+                    max={30}
+                    required
                     placeholder="Ex: 16"
                     value={newAge}
-                    onChange={e => setNewAge(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
+                    onChange={e => setNewAge(e.target.value !== '' ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden font-bold text-blue-600"
                   />
                 </div>
 
@@ -407,11 +620,11 @@ export const AcademyView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Nom des Parents / Tuteurs
+                    Nom du Parent / Tuteur Légal
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: M. et Mme Dupré"
+                    placeholder="Ex: M. Jean Marc"
                     value={newParentsName}
                     onChange={e => setNewParentsName(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -420,7 +633,7 @@ export const AcademyView: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Téléphone Parents
+                    Téléphone des Parents
                   </label>
                   <input
                     type="text"
@@ -434,11 +647,11 @@ export const AcademyView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Coach Tuteur Référent
+                  Entraîneur Tuteur Référent
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Marc Lemoine"
+                  placeholder="Ex: Coach Marc Lemoine"
                   value={newTutorCoach}
                   onChange={e => setNewTutorCoach(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -447,28 +660,43 @@ export const AcademyView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Appréciation Initiale & Objectifs
+                  Bilan Scolaire & Sportif (Observations)
                 </label>
                 <textarea
-                  rows={2}
-                  placeholder="Appréciation globale du comportement et niveau sportif..."
+                  rows={3}
+                  placeholder="Observations sur les résultats scolaires, l'attitude et l'évaluation sportive de l'académicien..."
                   value={newCoachComments}
                   onChange={e => setNewCoachComments(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
                 ></textarea>
               </div>
 
-              <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <input
-                  type="checkbox"
-                  id="schoolSupport"
-                  checked={newSchoolSupport}
-                  onChange={e => setNewSchoolSupport(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="schoolSupport" className="text-xs font-bold text-slate-700 cursor-pointer">
-                  Nécessite un aménagement / soutien scolaire club
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Diagnostic & Statut Scolaire
                 </label>
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="schoolSupportOption"
+                      checked={!newSchoolSupport}
+                      onChange={() => setNewSchoolSupport(false)}
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-emerald-700 font-bold">Pas de problème scolaire (Scolarité OK)</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="schoolSupportOption"
+                      checked={newSchoolSupport}
+                      onChange={() => setNewSchoolSupport(true)}
+                      className="text-rose-600 focus:ring-rose-500"
+                    />
+                    <span className="text-rose-700 font-bold">Besoin de soutien scolaire / suivi aménagement</span>
+                  </label>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
@@ -493,3 +721,4 @@ export const AcademyView: React.FC = () => {
     </div>
   );
 };
+
