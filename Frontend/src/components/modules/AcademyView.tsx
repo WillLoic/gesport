@@ -161,22 +161,26 @@ export const AcademyView: React.FC = () => {
     }
   };
 
+  const escapeHtml = (str: string | number | null | undefined): string => {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
   const handleGenerateBulletinPDF = (student: AcademyStudent) => {
     const teamName = getStudentTeamName(student);
     const age = getStudentAge(student);
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      showToast('Veuillez autoriser les pop-ups pour imprimer le bulletin.');
-      return;
-    }
 
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="fr">
       <head>
         <meta charset="UTF-8">
-        <title>Bulletin Trimestriel - ${student.studentName}</title>
+        <title>Bulletin Trimestriel - ${escapeHtml(student.studentName)}</title>
         <style>
           * { box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #0f172a; background: #ffffff; }
@@ -210,7 +214,7 @@ export const AcademyView: React.FC = () => {
           .sig-block { width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 10px; font-size: 12px; font-weight: bold; color: #64748b; }
           
           @media print {
-            .no-print { display: none !blank; }
+            @page { margin: 15mm; size: A4 portrait; }
             body { padding: 0; }
           }
         </style>
@@ -227,12 +231,12 @@ export const AcademyView: React.FC = () => {
         <div class="section">
           <div class="section-title">Profil & Informations Générales</div>
           <div class="grid-3">
-            <div class="card"><label>Nom & Prénom</label><val>${student.studentName}</val></div>
-            <div class="card"><label>Âge & Catégorie</label><val>${age} ans (${student.category})</val></div>
-            <div class="card"><label>Équipe du Joueur</label><val>${teamName}</val></div>
-            <div class="card"><label>Scolarité / Établissement</label><val>${student.schoolGrade}</val></div>
-            <div class="card"><label>Parent / Tuteur Légal</label><val>${student.parentsName} (${student.parentsPhone || 'Tél N/C'})</val></div>
-            <div class="card"><label>Entraîneur Tuteur Référent</label><val>${student.tutorCoachName}</val></div>
+            <div class="card"><label>Nom & Prénom</label><val>${escapeHtml(student.studentName)}</val></div>
+            <div class="card"><label>Âge & Catégorie</label><val>${age} ans (${escapeHtml(student.category)})</val></div>
+            <div class="card"><label>Équipe du Joueur</label><val>${escapeHtml(teamName)}</val></div>
+            <div class="card"><label>Scolarité / Établissement</label><val>${escapeHtml(student.schoolGrade)}</val></div>
+            <div class="card"><label>Parent / Tuteur Légal</label><val>${escapeHtml(student.parentsName)} (${escapeHtml(student.parentsPhone || 'Tél N/C')})</val></div>
+            <div class="card"><label>Entraîneur Tuteur Référent</label><val>${escapeHtml(student.tutorCoachName)}</val></div>
           </div>
         </div>
 
@@ -250,7 +254,7 @@ export const AcademyView: React.FC = () => {
           </div>
           <div class="obs-box">
             <strong>Bilan & Appréciation de l'Entraîneur / Référent :</strong><br/>
-            ${student.coachComments || 'Aucune observation complémentaire.'}
+            ${escapeHtml(student.coachComments || 'Aucune observation complémentaire.')}
           </div>
         </div>
 
@@ -271,7 +275,7 @@ export const AcademyView: React.FC = () => {
                 .map(
                   score => `
                 <tr>
-                  <td><strong>${score.quarter}</strong></td>
+                  <td><strong>${escapeHtml(score.quarter)}</strong></td>
                   <td class="score">${score.technicalScore}/20</td>
                   <td class="score">${score.tacticalScore}/20</td>
                   <td class="score">${score.athleticScore}/20</td>
@@ -288,19 +292,42 @@ export const AcademyView: React.FC = () => {
           <div class="sig-block">Visa & Signature des Parents / Tuteur</div>
           <div class="sig-block">Signature du Directeur de l'Académie</div>
         </div>
-
-        <div class="no-print" style="margin-top: 30px; text-align: center;">
-          <button onclick="window.print()" style="padding: 12px 28px; background: #2563eb; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(37,99,235,0.3);">
-            🖨️ Imprimer ou Télécharger le Bulletin (PDF)
-          </button>
-        </div>
       </body>
       </html>
     `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    showToast(`Bulletin trimestriel généré pour ${student.studentName}.`);
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
+
+    document.body.appendChild(iframe);
+
+    iframe.src = blobUrl;
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.error('Erreur lors de l\'impression PDF:', e);
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          URL.revokeObjectURL(blobUrl);
+        }, 1000);
+      }
+    };
+
+    showToast(`Impression/Téléchargement PDF lancé pour ${student.studentName}.`);
   };
 
   return (
@@ -440,7 +467,8 @@ export const AcademyView: React.FC = () => {
                 </div>
                 <div className="mt-1 space-y-1 text-xs text-slate-500">
                   <p>
-                    <strong className="text-slate-700">Âge :</strong> {getStudentAge(selectedStudent)} ans • <strong className="text-slate-700">Équipe :</strong>{' '}
+                    <strong className="text-slate-700">Âge :</strong> {getStudentAge(selectedStudent)} ans • 
+                    <strong className="text-slate-700">Équipe :</strong>{' '}
                     <span className="text-blue-700 font-bold">{getStudentTeamName(selectedStudent)}</span>
                   </p>
                   <p>Classe : {selectedStudent.schoolGrade}</p>
@@ -475,7 +503,7 @@ export const AcademyView: React.FC = () => {
               </div>
 
               {/* Progress Scores Breakdown */}
-              <div className="space-y-3">
+              {/* <div className="space-y-3">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
                   Évaluations Trimestrielles (/20)
                 </span>
@@ -490,7 +518,7 @@ export const AcademyView: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </div>
+              </div> */}
 
               <button
                 type="button"
