@@ -303,5 +303,17 @@ services:
       - documents_coffrefort
       - ecommerce_merchandising
 
+  # ── pgadmin (interface de BD) ──────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-willloic36@gmail.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-Willloic2005}
+    ports:
+      - "8080:80"
+    depends_on:
+      postgres :
+        condition: service_healthy
+
 volumes:
   postgres_data:
