@@ -33,7 +33,7 @@ class RbacTestCase(TestCase):
 
     def test_init_default_roles(self):
         roles_count = Role.objects.count()
-        self.assertEqual(roles_count, 7)
+        self.assertEqual(roles_count, 8)
 
     def test_assign_and_revoke_role(self):
         assignment = assign_role_to_user(

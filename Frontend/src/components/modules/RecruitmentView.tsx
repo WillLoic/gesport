@@ -293,7 +293,7 @@ export const RecruitmentView: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Mattéo Rossi"
+                    placeholder="Ex: Will Loic"
                     value={newFullName}
                     onChange={e => setNewFullName(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -306,7 +306,7 @@ export const RecruitmentView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: Passeur, Attaquant..."
+                    placeholder="Ex: Attaquant..."
                     value={newPosition}
                     onChange={e => setNewPosition(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -366,7 +366,7 @@ export const RecruitmentView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: AS Cannes Volley"
+                    placeholder="Ex: AS Gesport"
                     value={newCurrentClub}
                     onChange={e => setNewCurrentClub(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
