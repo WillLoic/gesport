@@ -34,12 +34,12 @@ jobs:
           python-version: '3.12'
 
       - name: 📦 Installer les dépendances
-        run: pip install -r Backend/requirements/dev.txt
+        run: pip install -r requirements/dev.txt
 
       - name: 🗄️ Appliquer les migrations
-        working-directory: Backend/src/services/${{ matrix.service }}
+        working-directory: /src/services/${{ matrix.service }}
         run: python manage.py migrate --run-syncdb
 
       - name: 🧪 Lancer les tests
-        working-directory: Backend/src/services/${{ matrix.service }}
+        working-directory: src/services/${{ matrix.service }}
         run: pytest -v
