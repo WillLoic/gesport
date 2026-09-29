@@ -1,0 +1,45 @@
+name: CI — Tests
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  tests:
+    name: Tests ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false    # si un service échoue, les autres continuent
+      matrix:
+        service:
+          - auth_iam
+          - sport_perf
+          - finance_sponsoring
+          - operation_logistique
+          - marketing_cms
+          - messaging_notification
+          - documents_coffrefort
+          - ecommerce_merchandising
+
+    steps:
+      - name: 📥 Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Installer Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: 📦 Installer les dépendances
+        run: pip install -r requirements/dev.txt
+
+      - name: 🗄️ Appliquer les migrations
+        working-directory: src/services/${{ matrix.service }}
+        run: python manage.py migrate --run-syncdb
+
+      - name: 🧪 Lancer les tests
+        working-directory: src/services/${{ matrix.service }}
+        run: pytest -v
