@@ -40,6 +40,10 @@ jobs:
         working-directory: /src/services/${{ matrix.service }}
         run: python manage.py migrate --run-syncdb
 
+      - name: 🗄️ Lancer les differents services
+        working-directory: /src/services/${{ matrix.service }}
+        run: python manage.py runserver --run-syncdb
+
       - name: 🧪 Lancer les tests
         working-directory: src/services/${{ matrix.service }}
         run: pytest -v
