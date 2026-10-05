@@ -1,0 +1,140 @@
+name: CD — Deploy
+
+# ─── DÉCLENCHEUR ───────────────────────────────────────────────
+# Ce pipeline se lance uniquement quand du code arrive sur main
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [develop,main]
+
+# ─── JOB 1 : BUILD ET PUSH DES IMAGES ─────────────────────────
+jobs:
+  build-and-push:
+    name: Build & Push — ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+
+    # La matrix lance ce job en parallèle pour chaque microservice
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          # name     = nom du service dans docker-compose
+          # image    = nom de l'image sur Docker Hub
+          # context  = dossier de build (là où est le Dockerfile)
+          - name: auth_iam
+            image: gesport-auth-iam
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          - name: sport_perf
+            image: gesport-sport-perf
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          - name: finance_sponsoring
+            image: gesport-finance-sponsoring
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          - name: operation_logistique
+            image: gesport-operation-logistique
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          - name: marketing_cms
+            image: gesport-marketing-cms
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          - name: messaging_notification
+            image: gesport-messaging-notification
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          - name: documents_coffrefort
+            image: gesport-documents-coffrefort
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          - name: ecommerce_merchandising
+            image: gesport-ecommerce-merchandising
+            context: ./Backend
+            dockerfile: Dockerfile
+
+          # L'API Gateway a son propre Dockerfile dans api_gateway/
+          - name: api_gateway
+            image: gesport-api-gateway
+            context: ./Backend/api_gateway
+            dockerfile: Dockerfile
+
+    steps:
+      # Clone ton repo sur le runner GitHub
+      - name: 📥 Récupérer le code
+        uses: actions/checkout@v4
+
+      # Se connecte à Docker Hub avec tes credentials stockés en secrets
+      # Sans ça docker push sera refusé
+      - name: 🔑 Se connecter à Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USER_NAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      # Build l'image et la pousse sur Docker Hub
+      # context : le dossier racine du build (là où Docker cherche les fichiers)
+      # dockerfile : chemin vers le Dockerfile
+      # push: true : envoie l'image sur Docker Hub après le build
+      # tags : deux tags pour la même image
+      #   - latest : toujours la dernière version
+      #   - github.sha : le SHA du commit exact qui a produit cette image
+      - name: 🏗️ Build et Push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.context }}/${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            willloic/${{ matrix.service.image }}:latest
+            willloic/${{ matrix.service.image }}:${{ github.sha }}
+
+# ─── JOB 2 : DÉPLOIEMENT SUR EC2 ──────────────────────────────
+  deploy:
+    name: Deploy sur EC2
+    runs-on: ubuntu-latest
+
+    # Ce job attend que TOUS les builds de la matrix réussissent
+    # Si un seul build échoue, le déploiement ne se lance pas
+    needs: build-and-push
+
+    steps:
+      # Se connecte à ton EC2 via SSH et exécute le script
+      # host : l'IP publique de ton EC2 (depuis les secrets)
+      # username : l'utilisateur SSH de ton EC2
+      # key : ta clé privée SSH (depuis les secrets)
+      # script : les commandes exécutées sur le serveur
+      - name: 🚀 SSH sur EC2 et déployer
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            # Aller dans le dossier du projet sur le serveur
+            cd ~/gesport/gesport/Backend/
+
+            # Pull toutes les nouvelles images depuis Docker Hub
+            # Docker va télécharger uniquement les layers qui ont changé
+            docker compose -f docker-compose.prod.yml pull
+
+            # Redémarre tous les containers avec les nouvelles images
+            # -d : mode détaché (en arrière-plan)
+            # --remove-orphans : supprime les containers qui ne sont
+            #                    plus dans le docker-compose.yml
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Supprime les anciennes images qui ne sont plus utilisées
+            # -f : force sans confirmation
+            # Libère de l'espace disque sur le serveur
+            docker image prune -f

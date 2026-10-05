@@ -1,0 +1,201 @@
+version: '3.8'
+
+services:
+  # ── Base de données PostgreSQL ───────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: gesport_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_MULTIPLE_DATABASES: iam_db,sport_db,finance_db,logistics_db,cms_db,chat_db,vault_db,ecommerce_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: gesport_redis
+    restart: always
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Microservice 01 : Auth IAM ───────────────────────────────
+  auth_iam:
+    image: willloic/gesport-auth-iam:latest   # ← pull depuis Docker Hub
+    container_name: gesport_auth_iam
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: auth_iam
+      PORT: 8001
+    expose:
+      - "8001"                                # ← plus de ports: en prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 02 : Sport & Performance ────────────────────
+  sport_perf:
+    image: willloic/gesport-sport-perf:latest
+    container_name: gesport_sport_perf
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: sport_perf
+      PORT: 8002
+    expose:
+      - "8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 03 : Finance & Sponsoring ───────────────────
+  finance_sponsoring:
+    image: willloic/gesport-finance-sponsoring:latest
+    container_name: gesport_finance_sponsoring
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: finance_sponsoring
+      PORT: 8003
+    expose:
+      - "8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 04 : Opérations & Logistique ────────────────
+  operation_logistique:
+    image: willloic/gesport-operation-logistique:latest
+    container_name: gesport_operation_logistique
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: operation_logistique
+      PORT: 8004
+    expose:
+      - "8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 05 : Marketing & CMS ───────────────────────
+  marketing_cms:
+    image: willloic/gesport-marketing-cms:latest
+    container_name: gesport_marketing_cms
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: marketing_cms
+      PORT: 8005
+    expose:
+      - "8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 06 : Messagerie & Notifications ─────────────
+  messaging_notification:
+    image: willloic/gesport-messaging-notification:latest
+    container_name: gesport_messaging_notification
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: messaging_notification
+      USE_ASGI: "true"
+      PORT: 8006
+    expose:
+      - "8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 07 : Documents & Coffre-Fort ────────────────
+  documents_coffrefort:
+    image: willloic/gesport-documents-coffrefort:latest
+    container_name: gesport_documents_coffrefort
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: documents_coffrefort
+      PORT: 8007
+    expose:
+      - "8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Microservice 08 : E-commerce & Merchandising ─────────────
+  ecommerce_merchandising:
+    image: willloic/gesport-ecommerce-merchandising:latest
+    container_name: gesport_ecommerce_merchandising
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      SERVICE_NAME: ecommerce_merchandising
+      PORT: 8008
+    expose:
+      - "8008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── API Gateway Nginx ────────────────────────────────────────
+  api_gateway:
+    image: willloic/gesport-api-gateway:latest
+    container_name: gesport_api_gateway
+    restart: always
+    ports:
+      - "8000:8000"     # ← seul port ouvert vers l'extérieur
+    depends_on:
+      - auth_iam
+      - sport_perf
+      - finance_sponsoring
+      - operation_logistique
+      - marketing_cms
+      - messaging_notification
+      - documents_coffrefort
+      - ecommerce_merchandising
+
+volumes:
+  postgres_data:
