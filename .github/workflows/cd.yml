@@ -131,7 +131,7 @@ jobs:
             # Redémarre tous les containers avec les nouvelles images
             # -d : mode détaché (en arrière-plan)
             # --remove-orphans : supprime les containers qui ne sont
-            #                    plus dans le docker-compose.yml
+            #                    plus dans le docker-compose.prod.yml
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             # Supprime les anciennes images qui ne sont plus utilisées
