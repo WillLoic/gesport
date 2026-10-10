@@ -299,4 +299,15 @@ export const fleetService = {
       body: JSON.stringify({ updated_mileage: updatedMileage }),
     });
   },
+
+  /**
+   * Libère un véhicule et clôture ses réservations actives
+   */
+  async releaseVehicle(vehicleId: string | number): Promise<Vehicle> {
+    const updated = await apiFetch<BackendVehicle>(`/ops/fleet/vehicles/${vehicleId}/release/`, {
+      method: 'POST',
+    });
+    return mapBackendVehicleToFrontend(updated);
+  },
 };
+

@@ -4,7 +4,19 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from apps.fleet.serializers.fleet_serializer import VehicleSerializer, VehicleReservationSerializer
 from apps.fleet.selectors.fleet_selector import get_all_vehicles, get_vehicle_by_id, get_all_reservations
-from apps.fleet.services.fleet_service import add_vehicle, create_vehicle_reservation, complete_reservation
+from apps.fleet.services.fleet_service import add_vehicle, create_vehicle_reservation, complete_reservation, release_vehicle
+
+
+class VehicleReleaseView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk):
+        v = get_vehicle_by_id(pk)
+        if not v:
+            return Response({'error': 'Véhicule non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        v = release_vehicle(v)
+        return Response(VehicleSerializer(v).data, status=status.HTTP_200_OK)
+
 from apps.fleet.models import Vehicle, VehicleReservation
 
 
