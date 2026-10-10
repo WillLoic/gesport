@@ -11,10 +11,19 @@ class MatchTestCase(TestCase):
     def test_create_match_callup_and_stats(self):
         m = create_member(club_id=1, first_name="Antoine", last_name="Griezmann", email="antoine@gesport.fr")
         team = create_team(club_id=1, name="Équipe Première", sport_type="football")
-        match = create_match(team_id=team.id, opponent_name="FC Nantes", match_date=timezone.now(), is_home=True)
+        match = create_match(
+            team_id=team.id,
+            opponent_name="FC Nantes",
+            match_date=timezone.now(),
+            is_home=True,
+            mvp_name="Antoine Griezmann",
+            coach_debrief="Excellente victoire et rigueur tactique.",
+        )
         callup = add_callup(match=match, member_id=m.id, status="Convoqué")
         stats = update_match_stats(match=match, member_id=m.id, points=2, assists=1, is_mvp=True)
 
         self.assertEqual(match.opponent_name, "FC Nantes")
+        self.assertEqual(match.mvp_name, "Antoine Griezmann")
+        self.assertEqual(match.coach_debrief, "Excellente victoire et rigueur tactique.")
         self.assertEqual(callup.status, "Convoqué")
         self.assertTrue(stats.is_mvp)
