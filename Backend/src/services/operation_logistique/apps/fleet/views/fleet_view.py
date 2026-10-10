@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from apps.fleet.serializers.fleet_serializer import VehicleSerializer, VehicleReservationSerializer
 from apps.fleet.selectors.fleet_selector import get_all_vehicles, get_vehicle_by_id, get_all_reservations
 from apps.fleet.services.fleet_service import add_vehicle, create_vehicle_reservation, complete_reservation
@@ -8,6 +9,8 @@ from apps.fleet.models import Vehicle, VehicleReservation
 
 
 class VehicleListCreateView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         status_param = request.query_params.get('status')
         vehicles = get_all_vehicles(status=status_param)
@@ -28,6 +31,8 @@ class VehicleListCreateView(APIView):
 
 
 class VehicleDetailView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request, pk):
         v = get_vehicle_by_id(pk)
         if not v:
@@ -53,6 +58,8 @@ class VehicleDetailView(APIView):
 
 
 class ReservationListCreateView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         v_id = request.query_params.get('vehicle_id')
         reservations = get_all_reservations(vehicle_id=v_id)
@@ -81,6 +88,8 @@ class ReservationListCreateView(APIView):
 
 
 class ReservationCompleteView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request, pk):
         res = VehicleReservation.objects.filter(pk=pk).first()
         if not res:
