@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from apps.inventory.serializers.inventory_serializer import EquipmentItemSerializer, StorageLocationSerializer
 from apps.inventory.selectors.inventory_selector import (
     get_all_equipment, get_equipment_by_id, get_low_stock_alerts, get_all_storage_locations
@@ -10,6 +11,8 @@ from apps.inventory.models import StorageLocation
 
 
 class StorageLocationListCreateView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         locations = get_all_storage_locations()
         return Response(StorageLocationSerializer(locations, many=True).data, status=status.HTTP_200_OK)
@@ -23,6 +26,8 @@ class StorageLocationListCreateView(APIView):
 
 
 class EquipmentItemListCreateView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         category = request.query_params.get('category')
         items = get_all_equipment(category=category)
@@ -46,6 +51,8 @@ class EquipmentItemListCreateView(APIView):
 
 
 class EquipmentItemDetailView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request, pk):
         item = get_equipment_by_id(pk)
         if not item:
@@ -74,6 +81,8 @@ class EquipmentItemDetailView(APIView):
 
 
 class EquipmentStockAlertsView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         alerts = get_low_stock_alerts()
         return Response(EquipmentItemSerializer(alerts, many=True).data, status=status.HTTP_200_OK)

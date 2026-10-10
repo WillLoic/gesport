@@ -9,9 +9,11 @@ import {
   X,
   MapPin,
   Clock,
+  Trash2,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { Vehicle } from '../../types';
+import { fleetService } from '../../services/operationsService';
 
 export const VehicleFleetView: React.FC = () => {
   const { vehicles, setVehicles, teams, staff, showToast } = useClub();
@@ -34,12 +36,31 @@ export const VehicleFleetView: React.FC = () => {
     new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0]
   );
 
-  const handleCreateBooking = (e: React.FormEvent) => {
+  const handleCreateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetTeam = teams.find(t => t.id === bookingTeamId) || teams[0];
     const targetVehicle = vehicles.find(v => v.id === selectedVehicleId);
 
     if (!targetVehicle) return;
+
+    const vehicleIdNum = Number(selectedVehicleId);
+    if (!isNaN(vehicleIdNum)) {
+      try {
+        const now = new Date().toISOString();
+        const end = new Date(Date.now() + 86400000).toISOString();
+        await fleetService.createReservation({
+          vehicleId: vehicleIdNum,
+          driverName: bookingDriver || 'Entraîneur Référent',
+          driverEmail: 'driver@club.com',
+          purpose: `${targetTeam?.name || 'Club'} -> ${bookingDestination}`,
+          startTime: now,
+          endTime: end,
+        });
+        await fleetService.updateVehicle(vehicleIdNum, { status: 'RESERVED' });
+      } catch (err) {
+        console.warn('Erreur réservation backend:', err);
+      }
+    }
 
     setVehicles(prev =>
       prev.map(v => {
@@ -62,35 +83,59 @@ export const VehicleFleetView: React.FC = () => {
     showToast(`Réservation confirmée pour le ${targetVehicle.name} (${targetTeam?.name} -> ${bookingDestination}) !`);
   };
 
-  const handleCreateVehicle = (e: React.FormEvent) => {
+  const handleCreateVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVehicleName.trim() || !newPlate.trim()) {
       showToast('Veuillez renseigner le nom et l\'immatriculation du véhicule.');
       return;
     }
 
-    const newVeh: Vehicle = {
-      id: `veh-${Date.now()}`,
+    const newVehPayload: Partial<Vehicle> = {
       name: newVehicleName.trim(),
       plateNumber: newPlate.trim().toUpperCase(),
       capacity: Number(newCapacity) || 9,
-      type: 'Minibus Club',
-      fuelType: 'Diesel',
       mileage: Number(newMileage) || 0,
+      fuelType: 'Diesel',
       status: 'Disponible',
       nextInspectionDate: newInspectionDate,
     };
 
-    setVehicles(prev => [newVeh, ...prev]);
-    setIsNewVehicleModalOpen(false);
-    showToast(`Nouveau véhicule "${newVeh.name}" ajouté à la flotte !`);
+    try {
+      const created = await fleetService.createVehicle(newVehPayload);
+      setVehicles(prev => [created, ...prev]);
+      showToast(`Nouveau véhicule "${created.name}" ajouté à la flotte !`);
+    } catch (err) {
+      console.error('Erreur création véhicule backend:', err);
+      const newVeh: Vehicle = {
+        id: `veh-${Date.now()}`,
+        name: newVehPayload.name!,
+        plateNumber: newVehPayload.plateNumber!,
+        capacity: newVehPayload.capacity!,
+        type: 'Minibus Club',
+        fuelType: 'Diesel',
+        mileage: newVehPayload.mileage!,
+        status: 'Disponible',
+        nextInspectionDate: newInspectionDate,
+      };
+      setVehicles(prev => [newVeh, ...prev]);
+      showToast(`Nouveau véhicule "${newVeh.name}" ajouté (mode hors-ligne) !`);
+    }
 
-    // Reset
+    setIsNewVehicleModalOpen(false);
     setNewVehicleName('');
     setNewPlate('');
   };
 
-  const handleReleaseVehicle = (vehicleId: string) => {
+  const handleReleaseVehicle = async (vehicleId: string) => {
+    const vehicleIdNum = Number(vehicleId);
+    if (!isNaN(vehicleIdNum)) {
+      try {
+        await fleetService.updateVehicle(vehicleIdNum, { status: 'AVAILABLE' });
+      } catch (err) {
+        console.warn('Erreur libération véhicule backend:', err);
+      }
+    }
+
     setVehicles(prev =>
       prev.map(v => {
         if (v.id === vehicleId) {
@@ -100,6 +145,20 @@ export const VehicleFleetView: React.FC = () => {
       })
     );
     showToast('Véhicule libéré et de retour au club !');
+  };
+
+  const handleDeleteVehicle = async (vehicleId: string) => {
+    const vehicleIdNum = Number(vehicleId);
+    if (!isNaN(vehicleIdNum)) {
+      try {
+        await fleetService.deleteVehicle(vehicleIdNum);
+      } catch (err) {
+        console.warn('Erreur suppression véhicule backend:', err);
+      }
+    }
+
+    setVehicles(prev => prev.filter(v => v.id !== vehicleId));
+    showToast('Véhicule supprimé de la flotte.');
   };
 
   return (
@@ -211,16 +270,26 @@ export const VehicleFleetView: React.FC = () => {
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>Contrôle tech : {veh.nextInspectionDate}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedVehicleId(veh.id);
-                    setIsBookingModalOpen(true);
-                  }}
-                  className="font-bold text-blue-600 hover:underline cursor-pointer"
-                >
-                  Réserver
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    title="Supprimer ce véhicule"
+                    onClick={() => handleDeleteVehicle(veh.id)}
+                    className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVehicleId(veh.id);
+                      setIsBookingModalOpen(true);
+                    }}
+                    className="font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Réserver
+                  </button>
+                </div>
               </div>
             </div>
           );
