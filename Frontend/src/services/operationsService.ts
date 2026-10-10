@@ -82,13 +82,13 @@ const conditionFromStatus: Record<string, InventoryItem['condition']> = {
 function mapBackendEquipmentToFrontend(eq: BackendEquipment): InventoryItem {
   return {
     id: String(eq.id),
-    name: eq.name,
+    name: eq.name || 'Équipement',
     category: categoryMap[eq.category] || 'Ballons',
-    quantityTotal: eq.quantity_in_stock,
-    quantityAvailable: eq.quantity_in_stock,
+    quantityTotal: eq.quantity_in_stock ?? 0,
+    quantityAvailable: eq.quantity_in_stock ?? 0,
     condition: conditionFromStatus[eq.status] || 'Bon état',
-    storageLocation: `Emplacement #${eq.location || 'N/A'}`,
-    minThresholdAlert: eq.min_stock_threshold,
+    storageLocation: eq.location ? `Emplacement #${eq.location}` : 'Local Matériel Principal',
+    minThresholdAlert: eq.min_stock_threshold ?? 5,
     qrCode: `MAT-${String(eq.id).padStart(4, '0')}`,
     borrowHistory: [],
   };
@@ -182,6 +182,23 @@ export const inventoryService = {
     const updated = await apiFetch<BackendEquipment>(`/ops/inventory/equipments/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify({ quantity_in_stock: newQuantity }),
+    });
+    return mapBackendEquipmentToFrontend(updated);
+  },
+
+  /**
+   * Met à jour un équipement complet (nom, catégorie, stock, etc.)
+   */
+  async updateEquipment(id: string | number, item: Partial<InventoryItem>): Promise<InventoryItem> {
+    const payload: Record<string, any> = {};
+    if (item.name) payload.name = item.name;
+    if (item.category) payload.category = reverseCategoryMap[item.category] || 'OTHER';
+    if (item.quantityAvailable !== undefined) payload.quantity_in_stock = item.quantityAvailable;
+    if (item.minThresholdAlert !== undefined) payload.min_stock_threshold = item.minThresholdAlert;
+
+    const updated = await apiFetch<BackendEquipment>(`/ops/inventory/equipments/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
     });
     return mapBackendEquipmentToFrontend(updated);
   },
@@ -310,4 +327,102 @@ export const fleetService = {
     return mapBackendVehicleToFrontend(updated);
   },
 };
+
+// ═══════════════════════════════════════════
+//  SERVICE API : Loans (Emprunts de matériel)
+// ═══════════════════════════════════════════
+
+export interface BackendLoan {
+  id: number;
+  equipment: number;
+  borrower_name: string;
+  borrower_email: string;
+  quantity_borrowed: number;
+  loan_date: string;
+  expected_return_date: string;
+  actual_return_date: string | null;
+  status: string;
+  initial_condition_notes: string;
+  return_condition_notes: string;
+}
+
+export interface EquipmentLoanItem {
+  id: string;
+  equipmentId: number;
+  borrowerName: string;
+  borrowerEmail: string;
+  quantity: number;
+  loanDate: string;
+  expectedReturnDate: string;
+  actualReturnDate?: string;
+  status: 'En cours' | 'Restitué' | 'En retard';
+  notes: string;
+}
+
+const loanStatusMap: Record<string, EquipmentLoanItem['status']> = {
+  'ACTIVE': 'En cours',
+  'RETURNED': 'Restitué',
+  'OVERDUE': 'En retard',
+};
+
+function mapBackendLoanToFrontend(loan: BackendLoan): EquipmentLoanItem {
+  return {
+    id: String(loan.id),
+    equipmentId: loan.equipment,
+    borrowerName: loan.borrower_name,
+    borrowerEmail: loan.borrower_email,
+    quantity: loan.quantity_borrowed,
+    loanDate: loan.loan_date,
+    expectedReturnDate: loan.expected_return_date,
+    actualReturnDate: loan.actual_return_date || undefined,
+    status: loanStatusMap[loan.status] || 'En cours',
+    notes: loan.initial_condition_notes || loan.return_condition_notes || '',
+  };
+}
+
+export const loanService = {
+  async getLoans(status?: string): Promise<EquipmentLoanItem[]> {
+    const url = status ? `/ops/loans/loans/?status=${status}` : '/ops/loans/loans/';
+    const data = await apiFetch<BackendLoan[]>(url);
+    return data.map(mapBackendLoanToFrontend);
+  },
+
+  async createLoan(loan: {
+    equipmentId: number;
+    borrowerName: string;
+    borrowerEmail?: string;
+    expectedReturnDate: string;
+    quantity?: number;
+    notes?: string;
+  }): Promise<EquipmentLoanItem> {
+    const payload = {
+      equipment: loan.equipmentId,
+      borrower_name: loan.borrowerName,
+      borrower_email: loan.borrowerEmail || 'borrower@club.com',
+      expected_return_date: loan.expectedReturnDate,
+      quantity_borrowed: loan.quantity || 1,
+      initial_condition_notes: loan.notes || 'Bon état',
+    };
+    const created = await apiFetch<BackendLoan>('/ops/loans/loans/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return mapBackendLoanToFrontend(created);
+  },
+
+  async returnLoan(loanId: string | number, notes?: string): Promise<EquipmentLoanItem> {
+    const updated = await apiFetch<BackendLoan>(`/ops/loans/loans/${loanId}/return/`, {
+      method: 'POST',
+      body: JSON.stringify({ return_condition_notes: notes || '' }),
+    });
+    return mapBackendLoanToFrontend(updated);
+  },
+
+  async deleteLoan(loanId: string | number): Promise<void> {
+    await apiFetch(`/ops/loans/loans/${loanId}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 

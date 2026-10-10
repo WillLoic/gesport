@@ -23,9 +23,9 @@ export const VehicleFleetView: React.FC = () => {
   // Booking Form State
   const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id || 'v1');
   const [bookingTeamId, setBookingTeamId] = useState(teams[0]?.id || 't1');
-  const [bookingDestination, setBookingDestination] = useState('Gymnase Municipal d\'Aix-en-Provence');
+  const [bookingDestination, setBookingDestination] = useState('');
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [bookingDriver, setBookingDriver] = useState(staff[0]?.name || 'Entraîneur Référent');
+  const [bookingDriver, setBookingDriver] = useState('');
 
   // New Vehicle Form State
   const [newVehicleName, setNewVehicleName] = useState('');
@@ -70,7 +70,7 @@ export const VehicleFleetView: React.FC = () => {
             status: 'En déplacement' as const,
             currentBooking: {
               teamName: targetTeam ? targetTeam.name : 'Équipe Club',
-              destination: bookingDestination.trim(),
+              destination: bookingDestination.trim() || 'Destination',
               date: bookingDate,
             },
           };
@@ -80,7 +80,9 @@ export const VehicleFleetView: React.FC = () => {
     );
 
     setIsBookingModalOpen(false);
-    showToast(`Réservation confirmée pour le ${targetVehicle.name} (${targetTeam?.name} -> ${bookingDestination}) !`);
+    showToast(`Réservation confirmée pour le ${targetVehicle.name} (${targetTeam?.name} -> ${bookingDestination || 'Destination'}) !`);
+    setBookingDestination('');
+    setBookingDriver('');
   };
 
   const handleCreateVehicle = async (e: React.FormEvent) => {
@@ -370,7 +372,7 @@ export const VehicleFleetView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Destination / Salle Extérieure *
+                  Destination / Salle Extérieure 
                 </label>
                 <input
                   type="text"

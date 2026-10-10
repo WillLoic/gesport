@@ -472,7 +472,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     inventoryService
       .getEquipments()
       .then((remoteEquipments) => {
-        setInventory(remoteEquipments || []);
+        setInventory(remoteEquipments && remoteEquipments.length > 0 ? remoteEquipments : INITIAL_INVENTORY);
       })
       .catch((err) => {
         console.warn('Microservice operation_logistique (inventory) non disponible:', err);
