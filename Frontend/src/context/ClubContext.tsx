@@ -42,6 +42,7 @@ import { tacticsService } from '../services/tacticsService';
 import { medicalService } from '../services/medicalService';
 import { academyService } from '../services/academyService';
 import { recruitmentService } from '../services/recruitmentService';
+import { inventoryService, fleetService } from '../services/operationsService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -240,15 +241,11 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Dossiers médicaux synchronisés uniquement avec le microservice backend (sport_perf / medical)
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem('sportflow_inventory');
-    return saved ? JSON.parse(saved) : INITIAL_INVENTORY;
-  });
+  // Inventaire synchronisé avec le microservice operation_logistique/inventory (initialement vide avant chargement DB)
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
-    const saved = localStorage.getItem('sportflow_vehicles');
-    return saved ? JSON.parse(saved) : INITIAL_VEHICLES;
-  });
+  // Véhicules synchronisés avec le microservice operation_logistique/fleet (initialement vide avant chargement DB)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
     const saved = localStorage.getItem('sportflow_purchases');
@@ -469,6 +466,34 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   }, []);
 
+
+  // Chargement initial de l'inventaire depuis le microservice operation_logistique (inventory)
+  useEffect(() => {
+    inventoryService
+      .getEquipments()
+      .then((remoteEquipments) => {
+        setInventory(remoteEquipments || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice operation_logistique (inventory) non disponible:', err);
+        const saved = localStorage.getItem('sportflow_inventory');
+        setInventory(saved ? JSON.parse(saved) : INITIAL_INVENTORY);
+      });
+  }, []);
+
+  // Chargement initial des véhicules depuis le microservice operation_logistique (fleet)
+  useEffect(() => {
+    fleetService
+      .getVehicles()
+      .then((remoteVehicles) => {
+        setVehicles(remoteVehicles || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice operation_logistique (fleet) non disponible:', err);
+        const saved = localStorage.getItem('sportflow_vehicles');
+        setVehicles(saved ? JSON.parse(saved) : INITIAL_VEHICLES);
+      });
+  }, []);
 
   // Multi-Sport Switcher logic
   const setCurrentSport = (sport: SportType) => {

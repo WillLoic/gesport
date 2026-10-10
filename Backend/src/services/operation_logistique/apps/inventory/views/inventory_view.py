@@ -56,9 +56,21 @@ class EquipmentItemDetailView(APIView):
         item = get_equipment_by_id(pk)
         if not item:
             return Response({'error': 'Équipement non trouvé'}, status=status.HTTP_404_NOT_FOUND)
-        if 'quantity_in_stock' in request.data:
-            item = update_stock_quantity(item, int(request.data['quantity_in_stock']))
-        return Response(EquipmentItemSerializer(item).data, status=status.HTTP_200_OK)
+        serializer = EquipmentItemSerializer(item, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            # Recalculate status based on stock
+            if 'quantity_in_stock' in request.data:
+                item = update_stock_quantity(item, int(request.data['quantity_in_stock']))
+            return Response(EquipmentItemSerializer(item).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        item = get_equipment_by_id(pk)
+        if not item:
+            return Response({'error': 'Équipement non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EquipmentStockAlertsView(APIView):
