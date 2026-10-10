@@ -1,97 +1,138 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  BarChart3,
   Trophy,
-  Award,
   Plus,
-  Flame,
   Star,
-  CheckCircle,
-  TrendingUp,
   X,
+  Trash2,
+  FileText,
+  Pencil,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { MatchStats } from '../../types';
+import { competitionService } from '../../services/competitionService';
 
 export const MatchAnalyticsView: React.FC = () => {
-  const { matchStats, setMatchStats, teams, members, currentSportConfig, showToast } = useClub();
-  const [selectedMatch, setSelectedMatch] = useState<MatchStats>(matchStats[0] || null);
+  const { matchStats, setMatchStats, teams, showToast } = useClub();
+  const [selectedMatch, setSelectedMatch] = useState<MatchStats | null>(matchStats[0] || null);
   const [isNewMatchModalOpen, setIsNewMatchModalOpen] = useState(false);
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
 
-  // New Match Form State
-  const [newTeamId, setNewTeamId] = useState(teams[0]?.id || 't1');
+  useEffect(() => {
+    if (!selectedMatch && matchStats.length > 0) {
+      setSelectedMatch(matchStats[0]);
+    }
+  }, [matchStats, selectedMatch]);
+
+  // Form State for Create / Edit
+  const [newTeamId, setNewTeamId] = useState(teams[0]?.id || '1');
   const [newMatchTitle, setNewMatchTitle] = useState('');
   const [newOpponent, setNewOpponent] = useState('');
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newResult, setNewResult] = useState<'Victoire' | 'Défaite'>('Victoire');
+  const [newResult, setNewResult] = useState<'Victoire' | 'Défaite' | 'Nul'>('Victoire');
   const [newFinalScore, setNewFinalScore] = useState('3 - 1');
   const [newMvpName, setNewMvpName] = useState('');
-  const [newSet1, setNewSet1] = useState('25-21');
-  const [newSet2, setNewSet2] = useState('23-25');
-  const [newSet3, setNewSet3] = useState('25-18');
-  const [newSet4, setNewSet4] = useState('25-20');
   const [newCoachDebrief, setNewCoachDebrief] = useState('');
 
-  const handleCreateMatch = (e: React.FormEvent) => {
+  const handleOpenCreateModal = () => {
+    setEditingMatchId(null);
+    setNewTeamId(teams[0]?.id || '1');
+    setNewMatchTitle('');
+    setNewOpponent('');
+    setNewDate(new Date().toISOString().split('T')[0]);
+    setNewResult('Victoire');
+    setNewFinalScore('3 - 1');
+    setNewMvpName('');
+    setNewCoachDebrief('');
+    setIsNewMatchModalOpen(true);
+  };
+
+  const handleOpenEditModal = (matchToEdit: MatchStats) => {
+    setEditingMatchId(matchToEdit.id);
+    const matchedTeam = teams.find(t => t.name === matchToEdit.teamName);
+    setNewTeamId(matchedTeam?.id || teams[0]?.id || '1');
+    setNewMatchTitle(matchToEdit.matchTitle || '');
+    setNewOpponent(matchToEdit.opponent || '');
+    setNewDate(matchToEdit.date || new Date().toISOString().split('T')[0]);
+    setNewResult(matchToEdit.result || 'Victoire');
+    setNewFinalScore(matchToEdit.finalScore || '3 - 1');
+    setNewMvpName(matchToEdit.mvpPlayerName || '');
+    setNewCoachDebrief(matchToEdit.coachDebrief || '');
+    setIsNewMatchModalOpen(true);
+  };
+
+  const handleSaveMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOpponent.trim()) {
       showToast('Veuillez renseigner le nom de l\'équipe adverse.');
       return;
     }
 
-    const assignedTeam = teams.find(t => t.id === newTeamId) || teams[0];
-    const teamMembers = members.filter(m => m.teamId === newTeamId);
+    const assignedTeam = teams.find(t => String(t.id) === String(newTeamId)) || teams[0];
 
-    // Build sets breakdown
-    const rawSets = [newSet1, newSet2, newSet3, newSet4].filter(s => s && s.includes('-'));
-    const setsDetail = rawSets.map((s, idx) => {
-      const parts = s.split('-').map(p => Number(p.trim()) || 0);
-      return {
-        setNumber: idx + 1,
-        scoreHome: parts[0] || 0,
-        scoreAway: parts[1] || 0,
-      };
-    });
-
-    const playerStats = (teamMembers.length > 0 ? teamMembers : members.slice(0, 5)).map((m, idx) => ({
-      playerId: m.id,
-      playerName: `${m.firstName} ${m.lastName}`,
-      pointsScored: 8 + Math.floor(Math.random() * 14),
-      aces: Math.floor(Math.random() * 4),
-      blocks: Math.floor(Math.random() * 5),
-      attackSuccessPct: 45 + Math.floor(Math.random() * 30),
-      serveFaults: Math.floor(Math.random() * 3),
-      rating: Number((7.0 + Math.random() * 2.5).toFixed(1)),
-    }));
-
-    const newMatch: MatchStats = {
-      id: `match-${Date.now()}`,
+    const draftMatch: MatchStats = {
+      id: editingMatchId || `match-${Date.now()}`,
       eventId: `ev-${Date.now()}`,
-      teamName: assignedTeam ? assignedTeam.name : 'Équipe 1',
+      teamName: assignedTeam ? assignedTeam.name : 'Gesport',
       opponent: newOpponent.trim(),
       date: newDate,
       matchTitle: newMatchTitle.trim() || `Journée de Championnat vs ${newOpponent.trim()}`,
       result: newResult,
       finalScore: newFinalScore.trim(),
-      mvpPlayerName: newMvpName.trim() || (playerStats[0] ? playerStats[0].playerName : 'Joueur du Match'),
-      setsDetail: setsDetail.length > 0 ? setsDetail : [
-        { setNumber: 1, scoreHome: 25, scoreAway: 21 },
-        { setNumber: 2, scoreHome: 25, scoreAway: 19 },
-        { setNumber: 3, scoreHome: 25, scoreAway: 17 },
-      ],
-      playerStats: playerStats,
-      coachDebrief: newCoachDebrief.trim() || 'Excellente combativité collective, rigueur tactique respectée et belle solidité sur les points cruciaux.',
+      mvpPlayerName: newMvpName.trim() || 'Non désigné',
+      setsDetail: [],
+      playerStats: [],
+      coachDebrief: newCoachDebrief.trim() || 'Aucun débriefing renseigné.',
     };
 
-    setMatchStats(prev => [newMatch, ...prev]);
-    setSelectedMatch(newMatch);
-    setIsNewMatchModalOpen(false);
-    showToast(`Feuille de match vs ${newMatch.opponent} enregistrée avec succès !`);
+    if (editingMatchId) {
+      try {
+        const updatedMatch = await competitionService.updateMatchStatsSheet(editingMatchId, draftMatch, Number(newTeamId) || 1);
+        setMatchStats(prev => prev.map(m => m.id === editingMatchId ? updatedMatch : m));
+        setSelectedMatch(updatedMatch);
+        showToast(`Feuille de match vs ${updatedMatch.opponent} modifiée avec succès !`);
+      } catch (err) {
+        console.warn('Modification match backend locale fallback:', err);
+        setMatchStats(prev => prev.map(m => m.id === editingMatchId ? draftMatch : m));
+        setSelectedMatch(draftMatch);
+        showToast(`Feuille de match vs ${draftMatch.opponent} modifiée en local !`);
+      }
+    } else {
+      try {
+        const createdMatch = await competitionService.createMatchStats(draftMatch, Number(newTeamId) || 1);
+        setMatchStats(prev => [createdMatch, ...prev]);
+        setSelectedMatch(createdMatch);
+        showToast(`Feuille de match vs ${createdMatch.opponent} enregistrée avec succès !`);
+      } catch (err) {
+        console.warn('Sauvegarde match backend fallback:', err);
+        setMatchStats(prev => [draftMatch, ...prev]);
+        setSelectedMatch(draftMatch);
+        showToast(`Feuille de match vs ${draftMatch.opponent} enregistrée en local !`);
+      }
+    }
 
-    // Reset Form
-    setNewOpponent('');
-    setNewMatchTitle('');
-    setNewCoachDebrief('');
+    setIsNewMatchModalOpen(false);
+  };
+
+  const handleDeleteMatch = async (matchToDelete: MatchStats) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la feuille de match vs ${matchToDelete.opponent} ?`)) {
+      return;
+    }
+
+    try {
+      if (matchToDelete.id && !matchToDelete.id.startsWith('match-')) {
+        await competitionService.deleteMatch(matchToDelete.id);
+      }
+    } catch (err) {
+      console.warn('Erreur suppression match backend:', err);
+    }
+
+    const updated = matchStats.filter(m => m.id !== matchToDelete.id);
+    setMatchStats(updated);
+    if (selectedMatch?.id === matchToDelete.id) {
+      setSelectedMatch(updated[0] || null);
+    }
+    showToast(`Feuille de match vs ${matchToDelete.opponent} supprimée avec succès.`);
   };
 
   return (
@@ -101,14 +142,14 @@ export const MatchAnalyticsView: React.FC = () => {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-display">Statistiques Sportives & Matchs</h1>
           <p className="text-xs sm:text-sm text-slate-500">
-            Feuilles de match digitales, notes individuelles des joueurs, sets détaillés et bilans des coachs
+            Feuilles de match digitales, bilans des rencontres et comptes-rendus tactiques des coachs
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setIsNewMatchModalOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer transition-all"
+          onClick={handleOpenCreateModal}
+          className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer transition-all"
         >
           <Plus className="w-4 h-4" />
           Saisir un Nouveau Match
@@ -120,30 +161,66 @@ export const MatchAnalyticsView: React.FC = () => {
         {matchStats.map(m => {
           const isSelected = selectedMatch?.id === m.id;
           return (
-            <button
+            <div
               key={m.id}
-              type="button"
-              onClick={() => setSelectedMatch(m)}
-              className={`p-3.5 rounded-xl border text-left transition-all ${
+              className={`flex items-center rounded-xl border transition-all ${
                 isSelected
                   ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                   : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
               }`}
             >
-              <div className="flex items-center justify-between gap-3 text-xs mb-1">
-                <span className="font-bold">{m.teamName}</span>
-                <span
-                  className={`px-2 py-0.2 rounded text-[10px] font-bold ${
-                    m.result === 'Victoire' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
-                  }`}
-                >
-                  {m.result} ({m.finalScore})
-                </span>
-              </div>
-              <p className={`text-xs ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
-                vs {m.opponent} • {m.date}
-              </p>
-            </button>
+              <button
+                type="button"
+                onClick={() => setSelectedMatch(m)}
+                className="p-3.5 text-left cursor-pointer flex-1"
+              >
+                <div className="flex items-center justify-between gap-3 text-xs mb-1">
+                  <span className="font-bold">{m.teamName}</span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      m.result === 'Victoire'
+                        ? 'bg-emerald-500 text-white'
+                        : m.result === 'Défaite'
+                        ? 'bg-rose-500 text-white'
+                        : 'bg-amber-500 text-white'
+                    }`}
+                  >
+                    {m.result} ({m.finalScore})
+                  </span>
+                </div>
+                <p className={`text-xs ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                  vs {m.opponent} • {m.date}
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenEditModal(m);
+                }}
+                className={`p-2 rounded-lg hover:bg-blue-500 hover:text-white transition-colors cursor-pointer ${
+                  isSelected ? 'text-slate-400 hover:text-white' : 'text-slate-400'
+                }`}
+                title="Modifier la feuille de match"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteMatch(m);
+                }}
+                className={`p-2 mr-1 rounded-lg hover:bg-rose-500 hover:text-white transition-colors cursor-pointer ${
+                  isSelected ? 'text-slate-400 hover:text-white' : 'text-slate-400'
+                }`}
+                title="Supprimer la feuille de match"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           );
         })}
       </div>
@@ -165,79 +242,92 @@ export const MatchAnalyticsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Set by set score chips */}
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedMatch.setsDetail.map(set => (
-                <div
-                  key={set.setNumber}
-                  className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-center"
-                >
-                  <span className="text-[10px] uppercase font-bold text-blue-300 block">Set {set.setNumber}</span>
-                  <span className="text-sm font-bold text-white">
-                    {set.scoreHome} - {set.scoreAway}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <div className="flex items-center gap-3">
+              {/* Score & Result Chip */}
+              <div className="px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-center">
+                <span className="text-[10px] uppercase font-bold text-blue-300 block mb-0.5">Score Final ({selectedMatch.result})</span>
+                <span className="text-lg font-black text-white">{selectedMatch.finalScore}</span>
+              </div>
 
-            {/* MVP Badge */}
-            <div className="p-3 rounded-xl bg-amber-400 text-slate-950 flex items-center gap-3 shadow-lg">
-              <Star className="w-6 h-6 fill-slate-950 text-slate-950" />
-              <div>
-                <span className="text-[10px] uppercase font-black tracking-wider">MVP de la Rencontre</span>
-                <p className="text-sm font-bold leading-tight">{selectedMatch.mvpPlayerName}</p>
+              {/* MVP Badge */}
+              <div className="p-3 rounded-xl bg-amber-400 text-slate-950 flex items-center gap-3 shadow-lg">
+                <Star className="w-6 h-6 fill-slate-950 text-slate-950" />
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-wider">MVP de la Rencontre</span>
+                  <p className="text-sm font-bold leading-tight">{selectedMatch.mvpPlayerName || 'Non désigné'}</p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Individual Players Performance Table */}
+          {/* Match Info Details Card */}
           <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
-            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-blue-600" />
-              Statistiques Individuelles des Joueurs
-            </h3>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                Informations Enregistrées de la Feuille de Match
+              </h3>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-3">Joueur</th>
-                    <th className="py-3 px-3 text-center">Points Marqués</th>
-                    <th className="py-3 px-3 text-center">Aces (Services)</th>
-                    <th className="py-3 px-3 text-center">Contres / Blocs</th>
-                    <th className="py-3 px-3 text-center">% Réussite Attaque</th>
-                    <th className="py-3 px-3 text-center">Fautes Service</th>
-                    <th className="py-3 px-3 text-right">Note Globale</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {selectedMatch.playerStats.map(ps => (
-                    <tr key={ps.playerId} className="hover:bg-slate-50">
-                      <td className="py-3 px-3 font-semibold text-slate-900">{ps.playerName}</td>
-                      <td className="py-3 px-3 text-center font-bold text-blue-600">{ps.pointsScored}</td>
-                      <td className="py-3 px-3 text-center text-emerald-600 font-semibold">{ps.aces}</td>
-                      <td className="py-3 px-3 text-center text-indigo-600 font-semibold">{ps.blocks}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="font-semibold text-slate-800">{ps.attackSuccessPct}%</span>
-                      </td>
-                      <td className="py-3 px-3 text-center text-rose-500 font-semibold">{ps.serveFaults}</td>
-                      <td className="py-3 px-3 text-right">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-lg font-bold text-xs ${
-                            ps.rating >= 8.5
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : ps.rating >= 7
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {ps.rating} / 10
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedMatch)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors cursor-pointer border border-amber-200"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Modifier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMatch(selectedMatch)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer border border-rose-200"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Supprimer
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-medium text-xs sm:text-sm">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Équipe du Club</span>
+                <p className="font-bold text-slate-900">{selectedMatch.teamName}</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Adversaire</span>
+                <p className="font-bold text-slate-900">{selectedMatch.opponent}</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Date de la Rencontre</span>
+                <p className="font-bold text-slate-900">{selectedMatch.date}</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Issue du Match</span>
+                <span
+                  className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-xs ${
+                    selectedMatch.result === 'Victoire'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : selectedMatch.result === 'Défaite'
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {selectedMatch.result}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Score Final</span>
+                <p className="font-bold text-blue-600">{selectedMatch.finalScore}</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-100">
+                <span className="text-[10px] uppercase font-bold text-amber-700 block mb-0.5">MVP Désigné</span>
+                <p className="font-bold text-amber-900">{selectedMatch.mvpPlayerName || 'Non désigné'}</p>
+              </div>
             </div>
           </div>
 
@@ -246,14 +336,14 @@ export const MatchAnalyticsView: React.FC = () => {
             <h3 className="font-bold text-sm text-slate-900 uppercase text-slate-400 tracking-wider">
               Analyse & Débriefing du Staff Technique
             </h3>
-            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-              "{selectedMatch.coachDebrief}"
+            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 font-medium whitespace-pre-wrap">
+              "{selectedMatch.coachDebrief || 'Aucun débriefing renseigné pour cette rencontre.'}"
             </p>
           </div>
         </div>
       )}
 
-      {/* New Match Modal */}
+      {/* New / Edit Match Modal */}
       {isNewMatchModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-6 my-8 animate-in fade-in zoom-in-95 duration-150">
@@ -263,20 +353,22 @@ export const MatchAnalyticsView: React.FC = () => {
                   <Trophy className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-slate-900 font-display">Nouvelle Feuille de Match</h3>
-                  <p className="text-xs text-slate-500">Saisissez les résultats officiels et statistiques de la rencontre</p>
+                  <h3 className="font-bold text-lg text-slate-900 font-display">
+                    {editingMatchId ? 'Modifier la Feuille de Match' : 'Nouvelle Feuille de Match'}
+                  </h3>
+                  <p className="text-xs text-slate-500">Saisissez les résultats officiels de la rencontre</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsNewMatchModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateMatch} className="space-y-4">
+            <form onSubmit={handleSaveMatch} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -345,6 +437,7 @@ export const MatchAnalyticsView: React.FC = () => {
                   >
                     <option value="Victoire">Victoire</option>
                     <option value="Défaite">Défaite</option>
+                    <option value="Nul">Nul</option>
                   </select>
                 </div>
               </div>
@@ -376,43 +469,6 @@ export const MatchAnalyticsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Set / Period breakdown */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Détail par Set / Mi-temps / Période (Scores)
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Set 1 (25-21)"
-                    value={newSet1}
-                    onChange={e => setNewSet1(e.target.value)}
-                    className="px-2.5 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-mono font-bold"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Set 2 (23-25)"
-                    value={newSet2}
-                    onChange={e => setNewSet2(e.target.value)}
-                    className="px-2.5 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-mono font-bold"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Set 3 (25-18)"
-                    value={newSet3}
-                    onChange={e => setNewSet3(e.target.value)}
-                    className="px-2.5 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-mono font-bold"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Set 4 (25-20)"
-                    value={newSet4}
-                    onChange={e => setNewSet4(e.target.value)}
-                    className="px-2.5 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-mono font-bold"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Débriefing & Bilan du Coach
@@ -430,15 +486,15 @@ export const MatchAnalyticsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsNewMatchModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors cursor-pointer"
                 >
-                  Enregistrer la Feuille de Match
+                  {editingMatchId ? 'Enregistrer les Modifications' : 'Enregistrer la Feuille de Match'}
                 </button>
               </div>
             </form>
@@ -448,3 +504,5 @@ export const MatchAnalyticsView: React.FC = () => {
     </div>
   );
 };
+
+

@@ -8,20 +8,37 @@ from apps.competitions.selectors.match_selector import list_team_matches, get_ma
 from apps.competitions.serializers.match_serializer import MatchEventSerializer, CallupSerializer, MatchPlayerStatsSerializer
 from apps.competitions.services.match_service import create_match, update_match, delete_match, add_callup, update_match_stats
 
+
+
+
 class MatchListCreateView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        team_id = request.query_params.get('team_id', 1)
-        matches = list_team_matches(int(team_id))
+        team_id = request.query_params.get('team_id')
+        if team_id:
+            try:
+                matches = list_team_matches(int(team_id))
+            except (ValueError, TypeError):
+                matches = MatchEvent.objects.all().order_by('-match_date')
+        else:
+            matches = MatchEvent.objects.all().order_by('-match_date')
         return Response(MatchEventSerializer(matches, many=True).data)
 
     def post(self, request: Request) -> Response:
-        serializer = MatchEventSerializer(data=request.data)
+        data = request.data.copy()
+        team_id = data.get('team')
+        if not team_id or team_id == 'undefined':
+            first_team = Team.objects.first()
+            if not first_team:
+                first_team = Team.objects.create(club_id=1, name='Gesport', category='Senior Régionale')
+            data['team'] = first_team.id
+
+        serializer = MatchEventSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data.copy()
-        team = data.pop('team')
-        match = create_match(team=team, **data)
+        validated_data = serializer.validated_data.copy()
+        team = validated_data.pop('team')
+        match = create_match(team=team, **validated_data)
         return Response(MatchEventSerializer(match).data, status=status.HTTP_201_CREATED)
 
 class MatchDetailView(APIView):

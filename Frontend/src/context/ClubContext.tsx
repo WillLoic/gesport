@@ -394,6 +394,17 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((err) => {
         console.warn('Microservice sport_perf (competitions) non disponible:', err);
       });
+
+    competitionService
+      .getMatchStatsList()
+      .then((remoteStats) => {
+        if (remoteStats && remoteStats.length > 0) {
+          setMatchStats(remoteStats);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice sport_perf (matchStats) non disponible:', err);
+      });
   }, []);
 
   // Chargement initial des exercices & entraînements depuis le microservice backend (sport_perf / tactics)

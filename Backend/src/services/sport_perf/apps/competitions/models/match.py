@@ -28,6 +28,9 @@ class MatchEvent(models.Model):
     score_away = models.IntegerField(null=True, blank=True, verbose_name="Score Extérieur")
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='A venir')
 
+    mvp_name = models.CharField(max_length=150, blank=True, default='', verbose_name="MVP Désigné")
+    coach_debrief = models.TextField(blank=True, default='', verbose_name="Débriefing / Bilan du Coach")
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
