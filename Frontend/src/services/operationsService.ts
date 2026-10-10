@@ -425,4 +425,77 @@ export const loanService = {
   },
 };
 
+// ═══════════════════════════════════════════
+//  SERVICE API : Procurement (Bons de Commande)
+// ═══════════════════════════════════════════
+
+export interface BackendPurchaseOrder {
+  id: number;
+  code: string;
+  supplier_name: string;
+  category: string;
+  description: string;
+  requested_by: string;
+  request_date: string;
+  total_amount_ttc: number | string;
+  status: string;
+  invoice_attached: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapBackendPurchaseOrderToFrontend(po: BackendPurchaseOrder): PurchaseOrder {
+  return {
+    id: String(po.id),
+    code: po.code,
+    supplierName: po.supplier_name,
+    category: po.category as any,
+    description: po.description,
+    totalAmountTTC: Number(po.total_amount_ttc) || 0,
+    requestedBy: po.requested_by,
+    requestDate: po.request_date,
+    status: po.status as any,
+    invoiceAttached: po.invoice_attached,
+  };
+}
+
+export const procurementService = {
+  async getPurchaseOrders(): Promise<PurchaseOrder[]> {
+    const data = await apiFetch<BackendPurchaseOrder[]>('/ops/procurement/orders/');
+    return data.map(mapBackendPurchaseOrderToFrontend);
+  },
+
+  async createPurchaseOrder(po: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
+    const payload = {
+      supplier_name: po.supplierName,
+      category: po.category || 'Matériel Sportif',
+      description: po.description,
+      requested_by: po.requestedBy || 'Responsable Matériel',
+      total_amount_ttc: po.totalAmountTTC || 0,
+      status: po.status || 'En attente validation',
+      invoice_attached: po.invoiceAttached || false,
+    };
+
+    const created = await apiFetch<BackendPurchaseOrder>('/ops/procurement/orders/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return mapBackendPurchaseOrderToFrontend(created);
+  },
+
+  async validatePurchaseOrder(id: string | number): Promise<PurchaseOrder> {
+    const updated = await apiFetch<BackendPurchaseOrder>(`/ops/procurement/orders/${id}/validate/`, {
+      method: 'POST',
+    });
+    return mapBackendPurchaseOrderToFrontend(updated);
+  },
+
+  async deletePurchaseOrder(id: string | number): Promise<void> {
+    await apiFetch(`/ops/procurement/orders/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+
 

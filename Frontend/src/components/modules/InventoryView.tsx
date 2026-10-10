@@ -412,12 +412,12 @@ export const InventoryView: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-center">
                         {isLowStock ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">
+                          <span key={`low-${item.id}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">
                             <AlertTriangle className="w-3 h-3" />
                             Stock Faible (&le; {item.minThresholdAlert})
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                          <span key={`ok-${item.id}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
                             <CheckCircle className="w-3 h-3" />
                             {item.condition}
                           </span>
@@ -515,14 +515,17 @@ export const InventoryView: React.FC = () => {
                           <div>Au : <span className="font-semibold text-blue-700">{loan.expectedReturnDate}</span></div>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                              isActive ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            {isActive ? <Clock className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
-                            {loan.status}
-                          </span>
+                          {isActive ? (
+                            <span key={`active-${loan.id}`} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">
+                              <Clock className="w-3 h-3" />
+                              {loan.status}
+                            </span>
+                          ) : (
+                            <span key={`returned-${loan.id}`} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                              <CheckCircle className="w-3 h-3" />
+                              {loan.status}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-2">

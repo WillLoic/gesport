@@ -6,10 +6,11 @@ import {
   Download,
   ShoppingCart,
   X,
-  FileText,
+  Trash2,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { PurchaseOrder } from '../../types';
+import { procurementService } from '../../services/operationsService';
 
 export const ProcurementView: React.FC = () => {
   const { purchaseOrders, setPurchaseOrders, staff, showToast } = useClub();
@@ -23,42 +24,84 @@ export const ProcurementView: React.FC = () => {
   const [newRequestDate, setNewRequestDate] = useState(new Date().toISOString().split('T')[0]);
   const [newInitialStatus, setNewInitialStatus] = useState<'En attente validation' | 'Validé'>('En attente validation');
 
-  const handleValidateOrder = (orderId: string) => {
+  const handleValidateOrder = async (orderId: string) => {
+    const orderIdNum = Number(orderId);
+    if (!isNaN(orderIdNum)) {
+      try {
+        const updated = await procurementService.validatePurchaseOrder(orderIdNum);
+        setPurchaseOrders(prev =>
+          prev.map(p => (p.id === orderId ? updated : p))
+        );
+        showToast(`Bon de commande ${updated.code} validé avec succès par la Trésorerie !`);
+        return;
+      } catch (err) {
+        console.warn('Erreur validation bon de commande backend:', err);
+      }
+    }
+
     setPurchaseOrders(prev =>
       prev.map(p => (p.id === orderId ? { ...p, status: 'Validé' } : p))
     );
     showToast('Bon de commande validé avec succès par la Trésorerie !');
   };
 
-  const handleCreateOrder = (e: React.FormEvent) => {
+  const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSupplier.trim() || !newDescription.trim()) {
       showToast('Veuillez renseigner le fournisseur et l\'objet de la commande.');
       return;
     }
 
-    const orderCount = purchaseOrders.length + 1;
-    const newOrder: PurchaseOrder = {
-      id: `po-${Date.now()}`,
-      code: `BC-2025-${String(orderCount).padStart(3, '0')}`,
+    const payload: Partial<PurchaseOrder> = {
       supplierName: newSupplier.trim(),
       category: 'Matériel Sportif',
       description: newDescription.trim(),
-      requestedBy: newRequestedBy.trim(),
-      requestDate: newRequestDate,
+      requestedBy: newRequestedBy.trim() || 'Responsable Matériel',
       totalAmountTTC: Number(newAmountTTC) || 0,
       status: newInitialStatus as any,
       invoiceAttached: false,
     };
 
-    setPurchaseOrders(prev => [newOrder, ...prev]);
-    setIsNewOrderModalOpen(false);
-    showToast(`Bon de commande ${newOrder.code} créé avec succès !`);
+    try {
+      const created = await procurementService.createPurchaseOrder(payload);
+      setPurchaseOrders(prev => [created, ...prev]);
+      showToast(`Bon de commande ${created.code} créé avec succès !`);
+    } catch (err) {
+      console.error('Erreur création bon de commande backend:', err);
+      const orderCount = purchaseOrders.length + 1;
+      const newOrder: PurchaseOrder = {
+        id: `po-${Date.now()}`,
+        code: `BC-2025-${String(orderCount).padStart(3, '0')}`,
+        supplierName: payload.supplierName!,
+        category: payload.category!,
+        description: payload.description!,
+        requestedBy: payload.requestedBy!,
+        requestDate: newRequestDate,
+        totalAmountTTC: payload.totalAmountTTC!,
+        status: payload.status!,
+        invoiceAttached: false,
+      };
+      setPurchaseOrders(prev => [newOrder, ...prev]);
+      showToast(`Bon de commande ${newOrder.code} créé (mode hors-ligne) !`);
+    }
 
-    // Reset Form
+    setIsNewOrderModalOpen(false);
     setNewSupplier('');
     setNewDescription('');
     setNewAmountTTC(200);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    const orderIdNum = Number(orderId);
+    if (!isNaN(orderIdNum)) {
+      try {
+        await procurementService.deletePurchaseOrder(orderIdNum);
+      } catch (err) {
+        console.warn('Erreur suppression bon de commande backend:', err);
+      }
+    }
+    setPurchaseOrders(prev => prev.filter(p => p.id !== orderId));
+    showToast('Bon de commande supprimé.');
   };
 
   return (
@@ -98,52 +141,74 @@ export const ProcurementView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {purchaseOrders.map(order => (
-                <tr key={order.id} className="hover:bg-slate-50">
-                  <td className="py-3 px-4 font-mono font-bold text-blue-600">{order.code}</td>
-                  <td className="py-3 px-4">
-                    <div className="font-bold text-slate-900">{order.supplierName}</div>
-                    <div className="text-xs text-slate-500">{order.description}</div>
-                  </td>
-                  <td className="py-3 px-4 text-slate-700">{order.requestedBy}</td>
-                  <td className="py-3 px-4 text-slate-600">{order.requestDate}</td>
-                  <td className="py-3 px-4 text-right font-bold text-slate-900 text-base">
-                    {order.totalAmountTTC.toLocaleString('fr-FR')} €
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        order.status === 'Validé' || order.status === 'Livré'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {order.status === 'En attente validation' ? <Clock className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
-                      <span>{order.status}</span>
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    {order.status === 'En attente validation' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleValidateOrder(order.id)}
-                        className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer"
-                      >
-                        Valider Achat
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => showToast(`Bon de commande ${order.code} téléchargé en PDF.`)}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-                        title="Télécharger le bon de commande"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    )}
+              {purchaseOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400 text-xs font-medium">
+                    Aucun bon de commande répertorié.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                purchaseOrders.map(order => {
+                  const isValidated = order.status === 'Validé' || order.status === 'Livré';
+                  return (
+                    <tr key={order.id} className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-mono font-bold text-blue-600">{order.code}</td>
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-slate-900">{order.supplierName}</div>
+                        <div className="text-xs text-slate-500">{order.description}</div>
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">{order.requestedBy}</td>
+                      <td className="py-3 px-4 text-slate-600">{order.requestDate}</td>
+                      <td className="py-3 px-4 text-right font-bold text-slate-900 text-base">
+                        {order.totalAmountTTC.toLocaleString('fr-FR')} €
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {isValidated ? (
+                          <span key={`val-${order.id}`} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                            <CheckCircle className="w-3 h-3" />
+                            <span>{order.status}</span>
+                          </span>
+                        ) : (
+                          <span key={`pend-${order.id}`} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                            <Clock className="w-3 h-3" />
+                            <span>{order.status}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {order.status === 'En attente validation' ? (
+                            <button
+                              type="button"
+                              onClick={() => handleValidateOrder(order.id)}
+                              className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer"
+                            >
+                              Valider Achat
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => showToast(`Bon de commande ${order.code} téléchargé en PDF.`)}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
+                              title="Télécharger le bon de commande"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 cursor-pointer transition-colors"
+                            title="Supprimer la commande"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
