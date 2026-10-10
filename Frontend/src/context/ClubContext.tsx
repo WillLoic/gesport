@@ -42,7 +42,7 @@ import { tacticsService } from '../services/tacticsService';
 import { medicalService } from '../services/medicalService';
 import { academyService } from '../services/academyService';
 import { recruitmentService } from '../services/recruitmentService';
-import { inventoryService, fleetService } from '../services/operationsService';
+import { inventoryService, fleetService, procurementService } from '../services/operationsService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -492,6 +492,20 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Microservice operation_logistique (fleet) non disponible:', err);
         const saved = localStorage.getItem('sportflow_vehicles');
         setVehicles(saved ? JSON.parse(saved) : INITIAL_VEHICLES);
+      });
+  }, []);
+
+  // Chargement initial des bons de commande depuis le microservice operation_logistique (procurement)
+  useEffect(() => {
+    procurementService
+      .getPurchaseOrders()
+      .then((remoteOrders) => {
+        setPurchaseOrders(remoteOrders && remoteOrders.length > 0 ? remoteOrders : INITIAL_PURCHASE_ORDERS);
+      })
+      .catch((err) => {
+        console.warn('Microservice operation_logistique (procurement) non disponible:', err);
+        const saved = localStorage.getItem('sportflow_purchases');
+        setPurchaseOrders(saved ? JSON.parse(saved) : INITIAL_PURCHASE_ORDERS);
       });
   }, []);
 

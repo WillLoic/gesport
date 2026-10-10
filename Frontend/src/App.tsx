@@ -8,6 +8,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { authService, UserBackendProfile } from './services/authService';
 import { getAccessToken } from './services/apiClient';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Modal and Drawer Components
 import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
@@ -108,11 +109,11 @@ const MainAppContent: React.FC<MainAppProps> = ({ user, onLogout }) => {
       case 'documents':
         return <DocumentManagementView />;
       case 'inventory':
-        return <InventoryView />;
+        return <ErrorBoundary><InventoryView /></ErrorBoundary>;
       case 'vehicles':
         return <VehicleFleetView />;
       case 'procurement':
-        return <ProcurementView />;
+        return <ErrorBoundary><ProcurementView /></ErrorBoundary>;
       case 'finance':
         return <FinanceLedgerView />;
       case 'invoices':
