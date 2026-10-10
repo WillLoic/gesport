@@ -4,7 +4,7 @@ from rest_framework import status
 from apps.fleet.serializers.fleet_serializer import VehicleSerializer, VehicleReservationSerializer
 from apps.fleet.selectors.fleet_selector import get_all_vehicles, get_vehicle_by_id, get_all_reservations
 from apps.fleet.services.fleet_service import add_vehicle, create_vehicle_reservation, complete_reservation
-from apps.fleet.models import VehicleReservation
+from apps.fleet.models import Vehicle, VehicleReservation
 
 
 class VehicleListCreateView(APIView):
@@ -33,6 +33,23 @@ class VehicleDetailView(APIView):
         if not v:
             return Response({'error': 'Véhicule non trouvé'}, status=status.HTTP_404_NOT_FOUND)
         return Response(VehicleSerializer(v).data, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        v = get_vehicle_by_id(pk)
+        if not v:
+            return Response({'error': 'Véhicule non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = VehicleSerializer(v, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(VehicleSerializer(v).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        v = get_vehicle_by_id(pk)
+        if not v:
+            return Response({'error': 'Véhicule non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        v.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ReservationListCreateView(APIView):
@@ -71,3 +88,4 @@ class ReservationCompleteView(APIView):
         mileage = request.data.get('updated_mileage')
         updated_res = complete_reservation(res, updated_mileage=mileage)
         return Response(VehicleReservationSerializer(updated_res).data, status=status.HTTP_200_OK)
+
