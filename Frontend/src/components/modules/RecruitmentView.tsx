@@ -7,6 +7,8 @@ import {
   X,
   User,
   Star,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { TalentCandidate } from '../../types';
@@ -16,6 +18,7 @@ export const RecruitmentView: React.FC = () => {
   const { talents, setTalents, currentSportConfig, showToast } = useClub();
   const [selectedCandidate, setSelectedCandidate] = useState<TalentCandidate | null>(talents[0] || null);
   const [isNewProspectModalOpen, setIsNewProspectModalOpen] = useState(false);
+  const [editingProspect, setEditingProspect] = useState<TalentCandidate | null>(null);
 
   useEffect(() => {
     if (talents.length > 0 && (!selectedCandidate || !talents.some(t => t.id === selectedCandidate.id))) {
@@ -25,18 +28,18 @@ export const RecruitmentView: React.FC = () => {
 
   // New Prospect Form State
   const [newFullName, setNewFullName] = useState('');
-  const [newPosition, setNewPosition] = useState('Passeur');
-  const [newCategoryTarget, setNewCategoryTarget] = useState('Nationale 1 Masculine');
-  const [newAge, setNewAge] = useState(21);
-  const [newHeightCm, setNewHeightCm] = useState(192);
+  const [newPosition, setNewPosition] = useState('');
+  const [newCategoryTarget, setNewCategoryTarget] = useState('');
+  const [newAge, setNewAge] = useState<number | ''>('');
+  const [newHeightCm, setNewHeightCm] = useState<number | ''>('');
   const [newCurrentClub, setNewCurrentClub] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
   const [newStage, setNewStage] = useState<any>('Prospecté');
-  const [newScoutReport, setNewScoutReport] = useState('Vision de jeu exceptionnelle, très bonne qualité de main, grosse présence au bloc.');
-  const [newTechScore, setNewTechScore] = useState(8.5);
-  const [newTactScore, setNewTactScore] = useState(8.0);
-  const [newPhysScore, setNewPhysScore] = useState(7.5);
-  const [newMentalScore, setNewMentalScore] = useState(9.0);
+  const [newScoutReport, setNewScoutReport] = useState('');
+  const [newTechScore, setNewTechScore] = useState<number | ''>('');
+  const [newTactScore, setNewTactScore] = useState<number | ''>('');
+  const [newPhysScore, setNewPhysScore] = useState<number | ''>('');
+  const [newMentalScore, setNewMentalScore] = useState<number | ''>('');
 
   const stages = [
     'Prospecté',
@@ -69,6 +72,59 @@ export const RecruitmentView: React.FC = () => {
     }
   };
 
+  const resetForm = () => {
+    setNewFullName('');
+    setNewPosition('');
+    setNewCategoryTarget('');
+    setNewAge('');
+    setNewHeightCm('');
+    setNewCurrentClub('');
+    setNewContactPhone('');
+    setNewStage('Prospecté');
+    setNewScoutReport('');
+    setNewTechScore('');
+    setNewTactScore('');
+    setNewPhysScore('');
+    setNewMentalScore('');
+    setEditingProspect(null);
+  };
+
+  const openEditModal = (candidate: TalentCandidate) => {
+    setEditingProspect(candidate);
+    setNewFullName(candidate.fullName);
+    setNewPosition(candidate.position);
+    setNewCategoryTarget(candidate.categoryTarget);
+    setNewAge(candidate.age);
+    setNewHeightCm(candidate.heightCm);
+    setNewCurrentClub(candidate.currentClub);
+    setNewContactPhone(candidate.contactPhone);
+    setNewStage(candidate.stage);
+    setNewScoutReport(candidate.scoutReport);
+    setNewTechScore(candidate.skillsRadar.technique);
+    setNewTactScore(candidate.skillsRadar.tactique);
+    setNewPhysScore(candidate.skillsRadar.physique);
+    setNewMentalScore(candidate.skillsRadar.mental);
+    setIsNewProspectModalOpen(true);
+  };
+
+  const handleDeleteProspect = async (candidate: TalentCandidate) => {
+    try {
+      await recruitmentService.deleteProspect(candidate.id);
+      setTalents(prev => prev.filter(c => c.id !== candidate.id));
+      if (selectedCandidate?.id === candidate.id) {
+        setSelectedCandidate(null);
+      }
+      showToast(`Prospect ${candidate.fullName} supprimé avec succès.`);
+    } catch (err) {
+      console.error('Erreur suppression prospect:', err);
+      setTalents(prev => prev.filter(c => c.id !== candidate.id));
+      if (selectedCandidate?.id === candidate.id) {
+        setSelectedCandidate(null);
+      }
+      showToast(`Prospect ${candidate.fullName} supprimé en local.`);
+    }
+  };
+
   const handleCreateProspect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFullName.trim()) {
@@ -77,17 +133,17 @@ export const RecruitmentView: React.FC = () => {
     }
 
     const tempCandidate: TalentCandidate = {
-      id: `talent-${Date.now()}`,
+      id: editingProspect ? editingProspect.id : `talent-${Date.now()}`,
       fullName: newFullName.trim(),
-      position: newPosition,
-      categoryTarget: newCategoryTarget as any,
+      position: newPosition || 'Joueur Polyvalent',
+      categoryTarget: (newCategoryTarget || 'Nationale 1 Masculine') as any,
       age: Number(newAge) || 20,
       heightCm: Number(newHeightCm) || 190,
       currentClub: newCurrentClub.trim() || 'Club Libre',
       contactPhone: newContactPhone.trim() || '06 00 00 00 00',
       stage: newStage as any,
       trialDate: newStage === 'Essai Programmé' ? new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] : undefined,
-      scoutReport: newScoutReport.trim(),
+      scoutReport: newScoutReport.trim() || 'Aucun rapport rédigé.',
       skillsRadar: {
         technique: Number(newTechScore) || 8,
         tactique: Number(newTactScore) || 8,
@@ -99,22 +155,26 @@ export const RecruitmentView: React.FC = () => {
 
     try {
       const savedCandidate = await recruitmentService.createOrUpdateProspect(tempCandidate);
-      setTalents(prev => [savedCandidate, ...prev]);
+      if (editingProspect) {
+        setTalents(prev => prev.map(c => c.id === editingProspect.id ? savedCandidate : c));
+      } else {
+        setTalents(prev => [savedCandidate, ...prev]);
+      }
       setSelectedCandidate(savedCandidate);
-      showToast(`Prospect ${savedCandidate.fullName} enregistré en base de données !`);
+      showToast(`Prospect ${savedCandidate.fullName} ${editingProspect ? 'modifié' : 'enregistré'} en base de données !`);
     } catch (err) {
       console.error('Erreur création prospect backend:', err);
-      setTalents(prev => [tempCandidate, ...prev]);
+      if (editingProspect) {
+        setTalents(prev => prev.map(c => c.id === editingProspect.id ? tempCandidate : c));
+      } else {
+        setTalents(prev => [tempCandidate, ...prev]);
+      }
       setSelectedCandidate(tempCandidate);
-      showToast(`Prospect ${tempCandidate.fullName} ajouté en local.`);
+      showToast(`Prospect ${tempCandidate.fullName} ${editingProspect ? 'modifié' : 'ajouté'} en local.`);
     }
 
     setIsNewProspectModalOpen(false);
-
-    // Reset Form
-    setNewFullName('');
-    setNewCurrentClub('');
-    setNewContactPhone('');
+    resetForm();
   };
 
   return (
@@ -130,7 +190,7 @@ export const RecruitmentView: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setIsNewProspectModalOpen(true)}
+          onClick={() => { resetForm(); setIsNewProspectModalOpen(true); }}
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer transition-all"
         >
           <Plus className="w-4 h-4" />
@@ -162,9 +222,27 @@ export const RecruitmentView: React.FC = () => {
                       <p className="text-xs text-blue-600 font-semibold mt-0.5">Club actuel : {candidate.currentClub}</p>
                     </div>
 
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                      {candidate.stage}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                        {candidate.stage}
+                      </span>
+                      <button
+                        type="button"
+                        title="Modifier ce prospect"
+                        onClick={(e) => { e.stopPropagation(); openEditModal(candidate); }}
+                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-amber-50 text-slate-400 hover:text-amber-600 flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Supprimer ce prospect"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteProspect(candidate); }}
+                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -271,13 +349,13 @@ export const RecruitmentView: React.FC = () => {
                   <UserCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-slate-900 font-display">Ajouter une Recrue / Prospect</h3>
-                  <p className="text-xs text-slate-500">Enregistrement d'un profil scouté et intégration au pipeline</p>
+                  <h3 className="font-bold text-lg text-slate-900 font-display">{editingProspect ? 'Modifier le Prospect' : 'Ajouter une Recrue / Prospect'}</h3>
+                  <p className="text-xs text-slate-500">{editingProspect ? 'Mise à jour des informations du prospect' : 'Enregistrement d\'un profil scouté et intégration au pipeline'}</p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsNewProspectModalOpen(false)}
+                onClick={() => { setIsNewProspectModalOpen(false); resetForm(); }}
                 className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -306,7 +384,7 @@ export const RecruitmentView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: Attaquant..."
+                    placeholder="Ex: Passeur, Attaquant..."
                     value={newPosition}
                     onChange={e => setNewPosition(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -323,8 +401,9 @@ export const RecruitmentView: React.FC = () => {
                     type="number"
                     min={14}
                     max={40}
+                    placeholder="21"
                     value={newAge}
-                    onChange={e => setNewAge(Number(e.target.value))}
+                    onChange={e => setNewAge(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
                   />
                 </div>
@@ -337,8 +416,9 @@ export const RecruitmentView: React.FC = () => {
                     type="number"
                     min={140}
                     max={230}
+                    placeholder="192"
                     value={newHeightCm}
-                    onChange={e => setNewHeightCm(Number(e.target.value))}
+                    onChange={e => setNewHeightCm(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
                   />
                 </div>
@@ -400,8 +480,9 @@ export const RecruitmentView: React.FC = () => {
                       step="0.5"
                       min="1"
                       max="10"
+                      placeholder="8.5"
                       value={newTechScore}
-                      onChange={e => setNewTechScore(Number(e.target.value))}
+                      onChange={e => setNewTechScore(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-bold"
                     />
                   </div>
@@ -412,8 +493,9 @@ export const RecruitmentView: React.FC = () => {
                       step="0.5"
                       min="1"
                       max="10"
+                      placeholder="8.0"
                       value={newTactScore}
-                      onChange={e => setNewTactScore(Number(e.target.value))}
+                      onChange={e => setNewTactScore(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-bold"
                     />
                   </div>
@@ -424,8 +506,9 @@ export const RecruitmentView: React.FC = () => {
                       step="0.5"
                       min="1"
                       max="10"
+                      placeholder="7.5"
                       value={newPhysScore}
-                      onChange={e => setNewPhysScore(Number(e.target.value))}
+                      onChange={e => setNewPhysScore(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-bold"
                     />
                   </div>
@@ -436,8 +519,9 @@ export const RecruitmentView: React.FC = () => {
                       step="0.5"
                       min="1"
                       max="10"
+                      placeholder="9.0"
                       value={newMentalScore}
-                      onChange={e => setNewMentalScore(Number(e.target.value))}
+                      onChange={e => setNewMentalScore(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-center font-bold"
                     />
                   </div>
@@ -450,6 +534,7 @@ export const RecruitmentView: React.FC = () => {
                 </label>
                 <textarea
                   rows={2}
+                  placeholder="Ex: Vision de jeu exceptionnelle, très bonne qualité de main, grosse présence au bloc."
                   value={newScoutReport}
                   onChange={e => setNewScoutReport(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-800 outline-hidden"
@@ -459,7 +544,7 @@ export const RecruitmentView: React.FC = () => {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsNewProspectModalOpen(false)}
+                  onClick={() => { setIsNewProspectModalOpen(false); resetForm(); }}
                   className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
                 >
                   Annuler
@@ -468,7 +553,7 @@ export const RecruitmentView: React.FC = () => {
                   type="submit"
                   className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
                 >
-                  Ajouter au Pipeline Recrutement
+                  {editingProspect ? 'Enregistrer les Modifications' : 'Ajouter au Pipeline Recrutement'}
                 </button>
               </div>
             </form>

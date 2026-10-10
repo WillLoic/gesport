@@ -28,7 +28,7 @@ class TalentProspect(models.Model):
 
     club_id = models.IntegerField(verbose_name="ID du Club", db_index=True)
     first_name = models.CharField(max_length=100, verbose_name="Prénom")
-    last_name = models.CharField(max_length=100, verbose_name="Nom")
+    last_name = models.CharField(max_length=100, blank=True, default='', verbose_name="Nom")
     birth_year = models.IntegerField(verbose_name="Année de naissance")
     sport_type = models.CharField(max_length=30, default='football', verbose_name="Sport")
     position = models.CharField(max_length=50, verbose_name="Poste principal")

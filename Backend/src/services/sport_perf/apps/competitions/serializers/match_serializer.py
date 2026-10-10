@@ -25,5 +25,6 @@ class MatchEventSerializer(serializers.ModelSerializer):
         model = MatchEvent
         fields = [
             'id', 'team', 'team_name', 'opponent_name', 'is_home', 'match_date',
-            'venue', 'score_home', 'score_away', 'status', 'callups', 'player_stats', 'created_at',
+            'venue', 'score_home', 'score_away', 'status', 'mvp_name', 'coach_debrief',
+            'callups', 'player_stats', 'created_at',
         ]

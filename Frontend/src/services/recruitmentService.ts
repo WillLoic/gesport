@@ -54,7 +54,7 @@ export function mapBackendProspectToFrontend(b: BackendTalentProspect): TalentCa
 export function mapFrontendCandidateToBackend(f: Partial<TalentCandidate>): Partial<BackendTalentProspect> {
   const nameParts = (f.fullName || '').trim().split(' ');
   const firstName = nameParts[0] || 'Prospect';
-  const lastName = nameParts.slice(1).join(' ') || '';
+  const lastName = nameParts.slice(1).join(' ') || '-';
   const currentYear = new Date().getFullYear();
   const birthYear = f.age ? currentYear - f.age : 2004;
 

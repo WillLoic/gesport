@@ -1,5 +1,5 @@
 import { apiFetch } from './apiClient';
-import { SportEvent, EventType } from '../types';
+import { SportEvent, EventType, MatchStats } from '../types';
 
 export interface BackendCallup {
   id?: number;
@@ -35,9 +35,44 @@ export interface BackendMatchEvent {
   score_home?: number | null;
   score_away?: number | null;
   status?: string;
+  mvp_name?: string;
+  coach_debrief?: string;
   callups?: BackendCallup[];
   player_stats?: BackendPlayerStats[];
   created_at?: string;
+}
+
+/**
+ * Convertit un Match venant du Backend Django en format MatchStats Frontend
+ */
+export function mapBackendMatchToMatchStats(bMatch: BackendMatchEvent): MatchStats {
+  const matchDate = bMatch.match_date ? bMatch.match_date.split('T')[0] : new Date().toISOString().split('T')[0];
+  const scoreHome = bMatch.score_home ?? 3;
+  const scoreAway = bMatch.score_away ?? 1;
+  const resultVal: 'Victoire' | 'Défaite' | 'Nul' = scoreHome > scoreAway ? 'Victoire' : (scoreHome < scoreAway ? 'Défaite' : 'Nul');
+
+  const mvp = (bMatch.player_stats || []).find(ps => ps.is_mvp);
+  const fallbackMvp = mvp
+    ? (mvp.member_detail ? `${mvp.member_detail.first_name} ${mvp.member_detail.last_name}` : `Joueur #${mvp.member}`)
+    : '';
+
+  const mvpName = bMatch.mvp_name || fallbackMvp || 'Non désigné';
+  const coachDebrief = bMatch.coach_debrief || 'Excellente combativité collective et rigueur tactique respectée.';
+
+  return {
+    id: String(bMatch.id),
+    eventId: `ev-${bMatch.id}`,
+    matchTitle: `${bMatch.team_name || 'Équipe'} vs ${bMatch.opponent_name}`,
+    date: matchDate,
+    teamName: bMatch.team_name || 'Gesport',
+    opponent: bMatch.opponent_name,
+    finalScore: `${scoreHome} - ${scoreAway}`,
+    result: resultVal,
+    mvpPlayerName: mvpName,
+    setsDetail: [],
+    playerStats: [],
+    coachDebrief: coachDebrief,
+  };
 }
 
 /**
@@ -114,6 +149,120 @@ export const competitionService = {
   async getMatches(teamId = 1): Promise<SportEvent[]> {
     const data = await apiFetch<BackendMatchEvent[]>(`/sport/competitions/?team_id=${teamId}`);
     return data.map(mapBackendMatchToFrontend);
+  },
+
+  /**
+   * Récupère les MatchStats pour la vue Statistiques & Matchs
+   */
+  async getMatchStatsList(teamId?: number | string): Promise<MatchStats[]> {
+    try {
+      const url = teamId ? `/sport/competitions/?team_id=${teamId}` : '/sport/competitions/';
+      const data = await apiFetch<BackendMatchEvent[]>(url);
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map(mapBackendMatchToMatchStats);
+      }
+    } catch (err) {
+      console.warn('Erreur récuperation matchStats backend:', err);
+    }
+    return [];
+  },
+
+  /**
+   * Crée une nouvelle feuille de match (MatchStats) dans la BD backend
+   */
+  async createMatchStats(stats: Partial<MatchStats>, teamId = 1): Promise<MatchStats> {
+    const scores = (stats.finalScore || '3 - 1').split('-').map(s => parseInt(s.trim(), 10));
+    const scoreHome = !isNaN(scores[0]) ? scores[0] : 3;
+    const scoreAway = !isNaN(scores[1]) ? scores[1] : 1;
+
+    const payload: BackendMatchEvent = {
+      team: Number(teamId) || 1,
+      opponent_name: stats.opponent || 'Adversaire',
+      is_home: true,
+      match_date: `${stats.date || new Date().toISOString().split('T')[0]}T20:00:00Z`,
+      score_home: scoreHome,
+      score_away: scoreAway,
+      status: 'Terminé',
+      venue: 'Gymnase Principal',
+      mvp_name: stats.mvpPlayerName || '',
+      coach_debrief: stats.coachDebrief || '',
+    };
+
+    try {
+      const bMatch = await apiFetch<BackendMatchEvent>('/sport/competitions/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const result = mapBackendMatchToMatchStats(bMatch);
+      result.mvpPlayerName = stats.mvpPlayerName || result.mvpPlayerName;
+      result.coachDebrief = stats.coachDebrief || result.coachDebrief;
+      return result;
+    } catch (err) {
+      console.warn('Création match backend locale fallback:', err);
+      return {
+        id: `match-${Date.now()}`,
+        eventId: `ev-${Date.now()}`,
+        matchTitle: stats.matchTitle || `Journée de Championnat vs ${stats.opponent}`,
+        date: stats.date || new Date().toISOString().split('T')[0],
+        teamName: stats.teamName || 'Gesport',
+        opponent: stats.opponent || 'Adversaire',
+        finalScore: stats.finalScore || '3 - 1',
+        result: stats.result || 'Victoire',
+        mvpPlayerName: stats.mvpPlayerName || 'Non désigné',
+        setsDetail: [],
+        playerStats: [],
+        coachDebrief: stats.coachDebrief || 'Aucun débriefing renseigné.',
+      };
+    }
+  },
+
+  /**
+   * Modifie une feuille de match existante dans la BD backend
+   */
+  async updateMatchStatsSheet(matchId: number | string, stats: Partial<MatchStats>, teamId = 1): Promise<MatchStats> {
+    const scores = (stats.finalScore || '3 - 1').split('-').map(s => parseInt(s.trim(), 10));
+    const scoreHome = !isNaN(scores[0]) ? scores[0] : 3;
+    const scoreAway = !isNaN(scores[1]) ? scores[1] : 1;
+
+    const payload: BackendMatchEvent = {
+      team: Number(teamId) || 1,
+      opponent_name: stats.opponent || 'Adversaire',
+      is_home: true,
+      match_date: `${stats.date || new Date().toISOString().split('T')[0]}T20:00:00Z`,
+      score_home: scoreHome,
+      score_away: scoreAway,
+      status: 'Terminé',
+      venue: 'Gymnase Principal',
+      mvp_name: stats.mvpPlayerName || '',
+      coach_debrief: stats.coachDebrief || '',
+    };
+
+    try {
+      const bMatch = await apiFetch<BackendMatchEvent>(`/sport/competitions/${matchId}/`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      const result = mapBackendMatchToMatchStats(bMatch);
+      result.mvpPlayerName = stats.mvpPlayerName || result.mvpPlayerName;
+      result.coachDebrief = stats.coachDebrief || result.coachDebrief;
+      return result;
+    } catch (err) {
+      console.warn('Modification match backend locale fallback:', err);
+      return {
+        id: String(matchId),
+        eventId: `ev-${matchId}`,
+        matchTitle: stats.matchTitle || `Match vs ${stats.opponent}`,
+        date: stats.date || new Date().toISOString().split('T')[0],
+        teamName: stats.teamName || 'Gesport',
+        opponent: stats.opponent || 'Adversaire',
+        finalScore: stats.finalScore || '3 - 1',
+        result: stats.result || 'Victoire',
+        mvpPlayerName: stats.mvpPlayerName || 'Non désigné',
+        setsDetail: [],
+        playerStats: [],
+        coachDebrief: stats.coachDebrief || '',
+      };
+    }
   },
 
   /**

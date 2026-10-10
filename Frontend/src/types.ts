@@ -201,7 +201,7 @@ export interface MatchStats {
   teamName: string;
   opponent: string;
   finalScore: string;
-  result: 'Victoire' | 'Défaite';
+  result: 'Victoire' | 'Défaite' | 'Nul';
   mvpPlayerName: string;
   setsDetail: { setNumber: number; scoreHome: number; scoreAway: number }[];
   playerStats: {

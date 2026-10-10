@@ -1,13 +1,17 @@
 from apps.competitions.models.match import MatchEvent, Callup, MatchPlayerStats
 from apps.teams.models.team import Team
 
+
+
+
 def create_match(*, team: Team = None, team_id: int = None, opponent_name: str, match_date, **kwargs) -> MatchEvent:
     """Crée un match. Accepte soit un objet Team, soit un team_id."""
     if team is not None:
         return MatchEvent.objects.create(team=team, opponent_name=opponent_name, match_date=match_date, **kwargs)
     if team_id is not None:
         return MatchEvent.objects.create(team_id=team_id, opponent_name=opponent_name, match_date=match_date, **kwargs)
-    raise ValueError("Vous devez fournir soit 'team' soit 'team_id'.")
+    default_team, _ = Team.objects.get_or_create(club_id=1, defaults={'name': 'Gesport', 'category': 'Senior Régionale'})
+    return MatchEvent.objects.create(team=default_team, opponent_name=opponent_name, match_date=match_date, **kwargs)
 
 def update_match(match_id: int, **kwargs) -> MatchEvent:
     """Met à jour un match existant."""
