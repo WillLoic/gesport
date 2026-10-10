@@ -130,7 +130,7 @@ export const VehicleFleetView: React.FC = () => {
     const vehicleIdNum = Number(vehicleId);
     if (!isNaN(vehicleIdNum)) {
       try {
-        await fleetService.updateVehicle(vehicleIdNum, { status: 'AVAILABLE' });
+        await fleetService.releaseVehicle(vehicleIdNum);
       } catch (err) {
         console.warn('Erreur libération véhicule backend:', err);
       }

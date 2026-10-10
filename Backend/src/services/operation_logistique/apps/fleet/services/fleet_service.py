@@ -32,6 +32,9 @@ def create_vehicle_reservation(
     if not check_vehicle_availability(vehicle.id, start_time, end_time):
         raise ValueError("Le véhicule est déjà réservé sur ce créneau horaire.")
 
+    vehicle.status = VehicleStatus.RESERVED
+    vehicle.save()
+
     return VehicleReservation.objects.create(
         vehicle=vehicle,
         driver_name=driver_name,
@@ -48,8 +51,23 @@ def complete_reservation(reservation: VehicleReservation, updated_mileage: int =
     reservation.status = ReservationStatus.COMPLETED
     reservation.save()
 
-    if updated_mileage and updated_mileage > reservation.vehicle.current_mileage:
-        reservation.vehicle.current_mileage = updated_mileage
-        reservation.vehicle.save()
+    vehicle = reservation.vehicle
+    vehicle.status = VehicleStatus.AVAILABLE
+    if updated_mileage and updated_mileage > vehicle.current_mileage:
+        vehicle.current_mileage = updated_mileage
+    vehicle.save()
 
     return reservation
+
+
+def release_vehicle(vehicle: Vehicle) -> Vehicle:
+    vehicle.status = VehicleStatus.AVAILABLE
+    vehicle.save()
+
+    VehicleReservation.objects.filter(
+        vehicle=vehicle,
+        status__in=[ReservationStatus.PENDING, ReservationStatus.APPROVED]
+    ).update(status=ReservationStatus.COMPLETED)
+
+    return vehicle
+
