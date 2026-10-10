@@ -1,3 +1,4 @@
+from apps.competitions.models.match import MatchEvent
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
