@@ -104,6 +104,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin, o
         email,
         phone_number: phoneNumber,
         password,
+        password_confirm: confirmPassword,
       });
 
       setSuccessMessage(res.detail || 'Inscription réussie ! Votre compte a été créé avec succès.');
@@ -390,15 +391,21 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin, o
                         Critères du mot de passe fort :
                       </div>
                       <div className={`flex items-center gap-2 font-medium ${hasMinLength ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {hasMinLength ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 text-center">•</span>}
+                        <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                          {hasMinLength ? <Check key="check-min" className="w-3.5 h-3.5" /> : <span key="dot-min" className="text-center">•</span>}
+                        </span>
                         <span>Au moins 8 caractères</span>
                       </div>
                       <div className={`flex items-center gap-2 font-medium ${hasUppercase ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {hasUppercase ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 text-center">•</span>}
+                        <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                          {hasUppercase ? <Check key="check-upper" className="w-3.5 h-3.5" /> : <span key="dot-upper" className="text-center">•</span>}
+                        </span>
                         <span>Au moins une lettre majuscule (A-Z)</span>
                       </div>
                       <div className={`flex items-center gap-2 font-medium ${hasNumber ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {hasNumber ? <Check className="w-3.5 h-3.5" /> : <span className="w-3.5 text-center">•</span>}
+                        <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                          {hasNumber ? <Check key="check-num" className="w-3.5 h-3.5" /> : <span key="dot-num" className="text-center">•</span>}
+                        </span>
                         <span>Au moins un chiffre (0-9)</span>
                       </div>
                     </div>
@@ -435,18 +442,22 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin, o
 
                     {/* Real-time Match Detection Status Badge */}
                     {isConfirmTyped && (
-                      <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold">
+                      <div
+                        key={passwordsMatch ? 'pwd-match' : 'pwd-mismatch'}
+                        className={`mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold ${
+                          passwordsMatch ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
                         {passwordsMatch ? (
-                          <span className="text-emerald-400 flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            Les mots de passe correspondent parfaitement.
-                          </span>
+                          <Check className="w-3.5 h-3.5 shrink-0" />
                         ) : (
-                          <span className="text-rose-400 flex items-center gap-1">
-                            <X className="w-3.5 h-3.5 text-rose-400" />
-                            Les mots de passe ne correspondent pas.
-                          </span>
+                          <X className="w-3.5 h-3.5 shrink-0" />
                         )}
+                        <span>
+                          {passwordsMatch
+                            ? 'Les mots de passe correspondent parfaitement.'
+                            : 'Les mots de passe ne correspondent pas.'}
+                        </span>
                       </div>
                     )}
                   </div>

@@ -12,11 +12,13 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { FinancialTransaction } from '../../types';
+import { ledgerService } from '../../services/financeService';
 
 export const FinanceLedgerView: React.FC = () => {
   const { finances, setFinances, showToast } = useClub();
   const [selectedType, setSelectedType] = useState<'all' | 'Recette' | 'Dépense'>('all');
   const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Transaction Form State
   const [entryType, setEntryType] = useState<'Recette' | 'Dépense'>('Recette');
@@ -42,7 +44,16 @@ export const FinanceLedgerView: React.FC = () => {
     selectedType === 'all' ? true : f.type === selectedType
   );
 
-  const handleToggleReconciled = (entryId: string) => {
+  const handleToggleReconciled = async (entryId: string) => {
+    const numericId = parseInt(entryId, 10);
+    if (!isNaN(numericId)) {
+      try {
+        await ledgerService.validateEntry(numericId);
+      } catch (err) {
+        console.warn('Erreur validation écriture comptable backend:', err);
+      }
+    }
+
     setFinances(prev =>
       prev.map(f =>
         f.id === entryId
@@ -53,32 +64,71 @@ export const FinanceLedgerView: React.FC = () => {
     showToast('Rapprochement bancaire actualisé !');
   };
 
-  const handleCreateTransaction = (e: React.FormEvent) => {
+  const handleCreateTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!entryLabel.trim() || !entryAmount) {
       showToast('Veuillez renseigner le libellé et le montant.');
       return;
     }
 
-    const newTx: FinancialTransaction = {
+    setIsSubmitting(true);
+
+    const fallbackTx: FinancialTransaction = {
       id: `tx-${Date.now()}`,
       date: entryDate,
       label: entryLabel.trim(),
-      category: entryCategory,
+      category: entryCategory as any,
       type: entryType,
       amount: Math.abs(Number(entryAmount)),
-      paymentMethod: entryPaymentMethod,
+      paymentMethod: entryPaymentMethod as any,
       invoiceReference: entryRef.trim() || undefined,
       status: entryStatus,
     };
 
-    setFinances(prev => [newTx, ...prev]);
-    setIsNewEntryModalOpen(false);
-    showToast(`Écriture comptable "${newTx.label}" enregistrée (${newTx.type === 'Recette' ? '+' : '-'}${newTx.amount} €) !`);
+    try {
+      // Récupérer un compte et exercice comptable existant, ou fallback
+      let fiscalYearId = 1;
+      let accountId = 1;
 
-    // Reset Form
-    setEntryLabel('');
-    setEntryRef('');
+      try {
+        const [fys, accounts] = await Promise.all([
+          ledgerService.getFiscalYears(1),
+          ledgerService.getAccounts(1),
+        ]);
+        if (fys.length > 0) fiscalYearId = fys[0].id;
+        if (accounts.length > 0) accountId = accounts[0].id;
+      } catch {
+        // Ignorer si les listes sont vides
+      }
+
+      const journal = entryType === 'Recette' ? 'VTE' : 'ACH';
+      const debit = entryType === 'Dépense' ? Math.abs(Number(entryAmount)) : 0;
+      const credit = entryType === 'Recette' ? Math.abs(Number(entryAmount)) : 0;
+
+      const createdEntry = await ledgerService.createJournalEntry({
+        club_id: 1,
+        fiscal_year: fiscalYearId,
+        account: accountId,
+        journal,
+        entry_date: entryDate,
+        reference: entryRef.trim() || `TX-${Date.now()}`,
+        label: entryLabel.trim(),
+        debit,
+        credit,
+      });
+
+      setFinances(prev => [createdEntry, ...prev]);
+      showToast(`Écriture comptable synchronisée dans le Grand Livre backend (${createdEntry.type === 'Recette' ? '+' : '-'}${createdEntry.amount} €) !`);
+    } catch (err) {
+      console.warn('Erreur création écriture backend, fallback local:', err);
+      setFinances(prev => [fallbackTx, ...prev]);
+      showToast(`Écriture "${fallbackTx.label}" enregistrée en mode local`);
+    } finally {
+      setIsSubmitting(false);
+      setIsNewEntryModalOpen(false);
+      setEntryLabel('');
+      setEntryRef('');
+    }
   };
 
   return (
@@ -422,9 +472,10 @@ export const FinanceLedgerView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md transition-colors"
                 >
-                  Enregistrer l'Écriture
+                  {isSubmitting ? 'Enregistrement Grand Livre...' : "Enregistrer l'Écriture"}
                 </button>
               </div>
             </form>

@@ -24,9 +24,11 @@ export interface LoginResponse {
 export interface RegisterPayload {
   email: string;
   password: string;
+  password_confirm: string; //a enlever
   first_name: string;
   last_name: string;
   phone_number?: string;
+  sport?: string; //a enlever
 }
 
 export const authService = {

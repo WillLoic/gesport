@@ -45,6 +45,7 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     # SimpleJWT : gestion des tokens d'authentification Access + Refresh
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     # CORS : autorise le Frontend React (localhost:3000) à appeler l'API
     'corsheaders',
     # Filtering : permet des filtres avancés sur les endpoints list

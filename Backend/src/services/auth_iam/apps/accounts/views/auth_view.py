@@ -53,12 +53,15 @@ class RegisterView(APIView):
 
     def post(self, request: Request) -> Response:
         serializer = UserRegistrationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)  # Retourne 400 automatiquement si invalide
+        if not serializer.is_valid():
+            print("❌ Registration validation errors:", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = serializer.save()
         except ValidationError as e:
-            return Response(e.message_dict, status=status.HTTP_400_BAD_REQUEST)
+            print("❌ User creation ValidationError:", getattr(e, 'message_dict', e))
+            return Response(getattr(e, 'message_dict', {"detail": str(e)}), status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             {
@@ -103,7 +106,9 @@ class LoginView(APIView):
                 result = verify_2fa_and_get_tokens(user=user, totp_code=totp_code)
 
         except ValidationError as e:
-            return Response(e.message_dict, status=status.HTTP_401_UNAUTHORIZED)
+            error_data = getattr(e, 'message_dict', {"detail": getattr(e, 'messages', [str(e)])[0] if getattr(e, 'messages', None) else str(e)})
+            print("❌ Login ValidationError:", error_data)
+            return Response(error_data, status=status.HTTP_401_UNAUTHORIZED)
 
         return Response(
             {

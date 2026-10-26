@@ -2,15 +2,18 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from apps.hr_contracts.serializers.hr_serializer import (
-    HRContractSerializer, LeaveRequestSerializer, StaffReplacementSerializer
+    HRContractSerializer, LeaveRequestSerializer, StaffReplacementSerializer,
+    ClubStaffMemberSerializer
 )
 from apps.hr_contracts.selectors.hr_selector import (
     get_all_hr_contracts, get_hr_contract_by_id, get_all_leave_requests,
-    get_leave_request_by_id, get_all_staff_replacements
+    get_leave_request_by_id, get_all_staff_replacements,
+    get_all_club_staff, get_club_staff_by_id
 )
 from apps.hr_contracts.services.hr_service import (
     create_hr_contract, terminate_hr_contract, create_leave_request,
-    approve_or_reject_leave, assign_staff_replacement
+    approve_or_reject_leave, assign_staff_replacement,
+    create_club_staff_member
 )
 from apps.vault.selectors.vault_selector import get_document_by_id
 
@@ -112,3 +115,42 @@ class StaffReplacementListCreateView(APIView):
             )
             return Response(StaffReplacementSerializer(rep).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ClubStaffMemberListCreateView(APIView):
+    def get(self, request):
+        department = request.query_params.get('department')
+        members = get_all_club_staff(department=department)
+        return Response(ClubStaffMemberSerializer(members, many=True).data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = ClubStaffMemberSerializer(data=request.data)
+        if serializer.is_valid():
+            member = create_club_staff_member(
+                name=serializer.validated_data['name'],
+                role=serializer.validated_data['role'],
+                department=serializer.validated_data['department'],
+                email=serializer.validated_data['email'],
+                phone=serializer.validated_data.get('phone', ''),
+                contract_type=serializer.validated_data.get('contract_type', 'CDI'),
+                qualifications=serializer.validated_data.get('qualifications', []),
+                assigned_teams=serializer.validated_data.get('assigned_teams', []),
+                access_level=serializer.validated_data.get('access_level', 'Coach'),
+            )
+            return Response(ClubStaffMemberSerializer(member).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ClubStaffMemberDetailView(APIView):
+    def get(self, request, pk):
+        member = get_club_staff_by_id(pk)
+        if not member:
+            return Response({'error': 'Membre du staff non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(ClubStaffMemberSerializer(member).data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk):
+        member = get_club_staff_by_id(pk)
+        if not member:
+            return Response({'error': 'Membre du staff non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        member.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

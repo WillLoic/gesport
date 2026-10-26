@@ -1,4 +1,4 @@
-import { apiFetch } from './apiClient';
+import { apiFetch, getAccessToken } from './apiClient';
 import { InventoryItem, Vehicle, PurchaseOrder } from '../types';
 
 // ═══════════════════════════════════════════
@@ -494,6 +494,36 @@ export const procurementService = {
     await apiFetch(`/ops/procurement/orders/${id}/`, {
       method: 'DELETE',
     });
+  },
+
+  async downloadPurchaseOrderPDF(id: string | number, code: string): Promise<void> {
+    const rawUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    const baseUrl = rawUrl.trim().replace(/\/+$/, '');
+    const token = getAccessToken();
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${baseUrl}/ops/procurement/orders/${id}/pdf/`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur ${response.status} lors de la génération du PDF.`);
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `Bon_de_Commande_${code}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
   },
 };
 

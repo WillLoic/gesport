@@ -43,6 +43,9 @@ import { medicalService } from '../services/medicalService';
 import { academyService } from '../services/academyService';
 import { recruitmentService } from '../services/recruitmentService';
 import { inventoryService, fleetService, procurementService } from '../services/operationsService';
+import { vaultService, governanceService, hrContractsService } from '../services/documentsService';
+import { ledgerService, invoicingService, sponsorshipService } from '../services/financeService';
+import { chatService } from '../services/messagingService';
 import {
   INITIAL_MEMBERS,
   INITIAL_STAFF,
@@ -247,10 +250,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Véhicules synchronisés avec le microservice operation_logistique/fleet (initialement vide avant chargement DB)
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
-    const saved = localStorage.getItem('sportflow_purchases');
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_ORDERS;
-  });
+  // Bons de commande synchronisés avec le microservice operation_logistique/procurement (initialement vide avant chargement DB)
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
   const [posProducts, setPosProducts] = useState<PosProduct[]>(() => {
     const saved = localStorage.getItem('sportflow_pos_products');
@@ -500,12 +501,134 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     procurementService
       .getPurchaseOrders()
       .then((remoteOrders) => {
-        setPurchaseOrders(remoteOrders && remoteOrders.length > 0 ? remoteOrders : INITIAL_PURCHASE_ORDERS);
+        setPurchaseOrders(remoteOrders || []);
       })
       .catch((err) => {
         console.warn('Microservice operation_logistique (procurement) non disponible:', err);
         const saved = localStorage.getItem('sportflow_purchases');
-        setPurchaseOrders(saved ? JSON.parse(saved) : INITIAL_PURCHASE_ORDERS);
+        setPurchaseOrders(saved ? JSON.parse(saved) : []);
+      });
+  }, []);
+
+  // Chargement initial des documents coffre-fort depuis le microservice documents_coffrefort (vault)
+  useEffect(() => {
+    vaultService
+      .getDocuments()
+      .then((remoteDocs) => {
+        if (remoteDocs && remoteDocs.length > 0) {
+          setDocuments(remoteDocs);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice documents_coffrefort (vault) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des assemblées / réunions depuis le microservice documents_coffrefort (governance)
+  useEffect(() => {
+    governanceService
+      .getAssemblies()
+      .then((remoteAssemblies) => {
+        if (remoteAssemblies && remoteAssemblies.length > 0) {
+          setMeetings(remoteAssemblies);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice documents_coffrefort (governance) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des contrats RH depuis le microservice documents_coffrefort (hr_contracts)
+  useEffect(() => {
+    hrContractsService
+      .getContracts()
+      .then((remoteContracts) => {
+        if (remoteContracts && remoteContracts.length > 0) {
+          setContracts(remoteContracts);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice documents_coffrefort (hr_contracts) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des congés staff depuis le microservice documents_coffrefort (hr_contracts)
+  useEffect(() => {
+    hrContractsService
+      .getLeaves()
+      .then((remoteLeaves) => {
+        if (remoteLeaves && remoteLeaves.length > 0) {
+          setLeaves(remoteLeaves);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice documents_coffrefort (hr_leaves) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des écritures comptables depuis le microservice finance_sponsoring (ledger)
+  useEffect(() => {
+    ledgerService
+      .getJournalEntries(1)
+      .then((remoteEntries) => {
+        if (remoteEntries && remoteEntries.length > 0) {
+          setFinances(remoteEntries);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice finance_sponsoring (ledger) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des factures depuis le microservice finance_sponsoring (invoicing)
+  useEffect(() => {
+    invoicingService
+      .getInvoices(1)
+      .then((remoteInvoices) => {
+        if (remoteInvoices && remoteInvoices.length > 0) {
+          setInvoices(remoteInvoices);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice finance_sponsoring (invoicing) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des partenaires & sponsors depuis le microservice finance_sponsoring (sponsors)
+  useEffect(() => {
+    sponsorshipService
+      .getSponsors(1)
+      .then((remoteSponsors) => {
+        if (remoteSponsors && remoteSponsors.length > 0) {
+          setSponsors(remoteSponsors);
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice finance_sponsoring (sponsors) non disponible:', err);
+      });
+  }, []);
+
+  // Chargement initial des salons de discussion & messages depuis le microservice messaging_notification (chat)
+  useEffect(() => {
+    chatService
+      .getChannels(1)
+      .then(async (remoteChannels) => {
+        if (remoteChannels && remoteChannels.length > 0) {
+          setChannels(remoteChannels);
+          // Charger les messages du premier canal
+          try {
+            const firstChanId = remoteChannels[0].id;
+            const remoteMsgs = await chatService.getChannelMessages(firstChanId);
+            if (remoteMsgs && remoteMsgs.length > 0) {
+              setMessages(remoteMsgs);
+            }
+          } catch {
+            // Ignorer si pas de messages
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Microservice messaging_notification (chat) non disponible:', err);
       });
   }, []);
 

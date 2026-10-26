@@ -9,10 +9,12 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { StaffContract } from '../../types';
+import { hrContractsService } from '../../services/documentsService';
 
 export const StaffContractsView: React.FC = () => {
   const { contracts, setContracts, showToast } = useClub();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states
   const [staffName, setStaffName] = useState('');
@@ -23,14 +25,21 @@ export const StaffContractsView: React.FC = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('2026-06-30');
 
-  const handleCreateContract = (e: React.FormEvent) => {
+  const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!staffName.trim()) {
       showToast('Veuillez entrer le nom du salarié.');
       return;
     }
 
-    const newContract: StaffContract = {
+    setIsSubmitting(true);
+
+    let backendType: 'CDI' | 'CDD' | 'PRESTATION' | 'STAGE' | 'BENEVOLAT' = 'CDD';
+    if (contractType === 'CDI') backendType = 'CDI';
+    else if (contractType === 'Indépendant' || contractType === 'Vacataire') backendType = 'PRESTATION';
+    else if (contractType === 'Service Civique') backendType = 'BENEVOLAT';
+
+    const fallbackContract: StaffContract = {
       id: `c-${Date.now()}`,
       staffName: staffName.trim(),
       role: role.trim(),
@@ -42,10 +51,28 @@ export const StaffContractsView: React.FC = () => {
       status: 'Actif',
     };
 
-    setContracts(prev => [newContract, ...prev]);
-    setIsModalOpen(false);
-    showToast(`Contrat de travail pour ${newContract.staffName} enregistré avec succès !`);
-    setStaffName('');
+    try {
+      const createdContract = await hrContractsService.createContract({
+        employee_name: staffName.trim(),
+        employee_email: `${staffName.toLowerCase().replace(/\s+/g, '.')}@gesport-club.com`,
+        position_title: role.trim(),
+        start_date: startDate,
+        end_date: endDate || null,
+        contract_type: backendType,
+        salary_monthly: Number(monthlySalary) || 1500,
+      });
+
+      setContracts(prev => [createdContract, ...prev]);
+      showToast(`Contrat RH pour ${createdContract.staffName} synchronisé avec le microservice backend !`);
+    } catch (err) {
+      console.warn('Erreur création contrat backend, fallback local:', err);
+      setContracts(prev => [fallbackContract, ...prev]);
+      showToast(`Contrat pour ${fallbackContract.staffName} enregistré en mode local`);
+    } finally {
+      setIsSubmitting(false);
+      setIsModalOpen(false);
+      setStaffName('');
+    }
   };
 
   return (
@@ -248,9 +275,10 @@ export const StaffContractsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-xs cursor-pointer"
                 >
-                  Enregistrer le Contrat
+                  {isSubmitting ? 'Enregistrement backend...' : 'Enregistrer le Contrat'}
                 </button>
               </div>
             </form>

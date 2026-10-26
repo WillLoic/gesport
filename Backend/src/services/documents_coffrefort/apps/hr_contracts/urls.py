@@ -5,7 +5,9 @@ from apps.hr_contracts.views.hr_view import (
     HRContractTerminateView,
     LeaveRequestListCreateView,
     LeaveRequestApproveRejectView,
-    StaffReplacementListCreateView
+    StaffReplacementListCreateView,
+    ClubStaffMemberListCreateView,
+    ClubStaffMemberDetailView,
 )
 
 urlpatterns = [
@@ -15,4 +17,6 @@ urlpatterns = [
     path('leaves/', LeaveRequestListCreateView.as_view(), name='hr-leave-list-create'),
     path('leaves/<int:pk>/approve-reject/', LeaveRequestApproveRejectView.as_view(), name='hr-leave-approve-reject'),
     path('replacements/', StaffReplacementListCreateView.as_view(), name='hr-replacement-list-create'),
+    path('staff-members/', ClubStaffMemberListCreateView.as_view(), name='club-staff-list-create'),
+    path('staff-members/<int:pk>/', ClubStaffMemberDetailView.as_view(), name='club-staff-detail'),
 ]

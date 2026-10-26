@@ -13,11 +13,13 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { ClubMeeting } from '../../types';
+import { governanceService } from '../../services/documentsService';
 
 export const ClubMeetingsView: React.FC = () => {
   const { meetings, setMeetings, showToast } = useClub();
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>(meetings[0]?.id || '');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Meeting Form State
   const [newTitle, setNewTitle] = useState('');
@@ -31,7 +33,11 @@ export const ClubMeetingsView: React.FC = () => {
 
   const selectedMeeting = meetings.find(m => m.id === selectedMeetingId) || meetings[0] || null;
 
-  const handleCastVote = (meetingId: string, voteIndex: number, type: 'pour' | 'contre' | 'abstention') => {
+  const handleCastVote = async (meetingId: string, voteIndex: number, type: 'pour' | 'contre' | 'abstention') => {
+    let votesFor = 0;
+    let votesAgainst = 0;
+    let votesAbstain = 0;
+
     setMeetings(prev =>
       prev.map(m => {
         if (m.id === meetingId) {
@@ -41,6 +47,10 @@ export const ClubMeetingsView: React.FC = () => {
           if (type === 'contre') target.votesAgainst += 1;
           if (type === 'abstention') target.abstentions += 1;
 
+          votesFor = target.votesFor;
+          votesAgainst = target.votesAgainst;
+          votesAbstain = target.abstentions;
+
           target.result = target.votesFor >= target.votesAgainst ? 'Adopté' : 'Rejeté';
           updatedVotes[voteIndex] = target;
           return { ...m, votes: updatedVotes };
@@ -48,22 +58,34 @@ export const ClubMeetingsView: React.FC = () => {
         return m;
       })
     );
+
+    const numericId = parseInt(meetingId, 10);
+    if (!isNaN(numericId)) {
+      governanceService.voteResolution(numericId, {
+        votes_for: votesFor,
+        votes_against: votesAgainst,
+        votes_abstain: votesAbstain,
+      }).catch((err) => console.warn('Vote backend sync:', err));
+    }
+
     showToast(`Votre vote "${type}" a été comptabilisé sur la résolution !`);
   };
 
-  const handleCreateMeeting = (e: React.FormEvent) => {
+  const handleCreateMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
       showToast('Veuillez indiquer un titre pour la réunion.');
       return;
     }
 
+    setIsSubmitting(true);
+
     const agendaItems = newAgenda
       .split('\n')
       .map(item => item.trim())
       .filter(Boolean);
 
-    const newMeeting: ClubMeeting = {
+    const fallbackMeeting: ClubMeeting = {
       id: `meet-${Date.now()}`,
       title: newTitle,
       type: newType,
@@ -88,13 +110,40 @@ export const ClubMeetingsView: React.FC = () => {
       minutesGenerated: false,
     };
 
-    setMeetings(prev => [newMeeting, ...prev]);
-    setSelectedMeetingId(newMeeting.id);
-    setShowCreateModal(false);
-    showToast(`La réunion "${newTitle}" a été convoquée avec succès ! Convocations envoyées.`);
+    let assembly_type: 'ORDINARY' | 'EXTRAORDINARY' | 'SPECIAL' = 'ORDINARY';
+    if (newType === 'AG Extraordinaire') assembly_type = 'EXTRAORDINARY';
+    else if (newType === 'Comité Technique' || newType === 'Commission Discipline') assembly_type = 'SPECIAL';
 
-    // Reset Form
-    setNewTitle('');
+    try {
+      const scheduled_at = `${newDate}T${newTime || '19:00'}:00Z`;
+      const createdAssembly = await governanceService.createAssembly({
+        title: newTitle.trim(),
+        scheduled_at,
+        assembly_type,
+        location: newLocation.trim(),
+        recipient_emails: ['direction@gesport-club.com', 'secretaire@gesport-club.com'],
+      });
+
+      if (newResolution.trim() && !isNaN(parseInt(createdAssembly.id, 10))) {
+        await governanceService.addResolution(createdAssembly.id, {
+          title: newResolution.trim(),
+          description: 'Résolution soumise au vote des membres',
+        }).catch(() => null);
+      }
+
+      setMeetings(prev => [createdAssembly, ...prev]);
+      setSelectedMeetingId(createdAssembly.id);
+      showToast(`L'assemblée "${newTitle}" a été convoquée et enregistrée dans le microservice gouvernance !`);
+    } catch (err) {
+      console.warn('Erreur création assemblée backend, fallback local:', err);
+      setMeetings(prev => [fallbackMeeting, ...prev]);
+      setSelectedMeetingId(fallbackMeeting.id);
+      showToast(`La réunion "${newTitle}" a été convoquée en mode local.`);
+    } finally {
+      setIsSubmitting(false);
+      setShowCreateModal(false);
+      setNewTitle('');
+    }
   };
 
   return (
@@ -399,9 +448,10 @@ export const ClubMeetingsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-xs"
                 >
-                  Envoyer Convocations & Créer Séance
+                  {isSubmitting ? 'Convocations & Création...' : 'Envoyer Convocations & Créer Séance'}
                 </button>
               </div>
             </form>

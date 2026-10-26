@@ -30,6 +30,9 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [AllowAny]
 
 
+from django.http import HttpResponse
+from ..services.pdf_service import generate_purchase_order_pdf
+
 class PurchaseOrderValidateView(APIView):
     permission_classes = [AllowAny]
 
@@ -40,5 +43,20 @@ class PurchaseOrderValidateView(APIView):
             order.save()
             serializer = PurchaseOrderSerializer(order)
             return Response(serializer.data, status=status.HTTP_200_OK)
+        except PurchaseOrder.DoesNotExist:
+            return Response({"detail": "Bon de commande introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class PurchaseOrderPDFView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk=None):
+        try:
+            order = PurchaseOrder.objects.get(pk=pk)
+            pdf_bytes = generate_purchase_order_pdf(order)
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            filename = f"Bon_de_Commande_{order.code}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
         except PurchaseOrder.DoesNotExist:
             return Response({"detail": "Bon de commande introuvable."}, status=status.HTTP_404_NOT_FOUND)

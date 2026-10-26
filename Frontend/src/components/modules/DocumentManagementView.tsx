@@ -11,12 +11,14 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { DocumentItem } from '../../types';
+import { vaultService } from '../../services/documentsService';
 
 export const DocumentManagementView: React.FC = () => {
   const { documents, setDocuments, staff, showToast } = useClub();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Doc Form State
   const [newTitle, setNewTitle] = useState('');
@@ -44,30 +46,73 @@ export const DocumentManagementView: React.FC = () => {
     return matchesSearch && matchesCat;
   });
 
-  const handleCreateDocument = (e: React.FormEvent) => {
+  const handleCreateDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
       showToast('Veuillez renseigner le titre du document.');
       return;
     }
 
-    const newDoc: DocumentItem = {
+    setIsSubmitting(true);
+
+    // Mappage du niveau de confidentialité vers le backend
+    let confidentiality_level: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED' = 'CONFIDENTIAL';
+    if (newAccessRole === 'Public (Tous les adhérents)') confidentiality_level = 'PUBLIC';
+    else if (newAccessRole === 'Bureau & Direction uniquement') confidentiality_level = 'RESTRICTED';
+    else if (newAccessRole === 'Staff & Entraîneurs') confidentiality_level = 'INTERNAL';
+
+    const fallbackDoc: DocumentItem = {
       id: `doc-${Date.now()}`,
       title: newTitle.trim(),
       category: newCategory,
-      fileType: newFileType,
+      fileType: newFileType as any,
       fileSize: newFileSize,
       uploadDate: new Date().toISOString().split('T')[0],
       author: newAuthor.trim(),
-      accessRole: newAccessRole,
+      accessRole: newAccessRole as any,
     };
 
-    setDocuments(prev => [newDoc, ...prev]);
-    setIsNewDocModalOpen(false);
-    showToast(`Document "${newDoc.title}" déposé dans le coffre-fort numérique !`);
+    try {
+      const createdDoc = await vaultService.createDocument({
+        title: newTitle.trim(),
+        file_path_or_s3_key: `s3://gesport-vault/${Date.now()}_${newTitle.toLowerCase().replace(/\s+/g, '_')}.${newFileType.toLowerCase()}`,
+        description: `Catégorie: ${newCategory} | Rôle: ${newAccessRole}`,
+        file_size: 1450000,
+        mime_type: newFileType === 'PDF' ? 'application/pdf' : 'application/octet-stream',
+        confidentiality_level,
+        uploaded_by: newAuthor.trim(),
+        is_encrypted: true,
+        encryption_algorithm: 'AES-256',
+      });
 
-    // Reset
-    setNewTitle('');
+      setDocuments(prev => [createdDoc, ...prev]);
+      showToast(`Document "${createdDoc.title}" chiffré AES-256 et enregistré dans le coffre-fort backend !`);
+    } catch (err: any) {
+      console.warn('Erreur lors du dépôt backend, sauvegarde locale:', err);
+      setDocuments(prev => [fallbackDoc, ...prev]);
+      showToast(`Document "${fallbackDoc.title}" déposé en mode local (backend inaccessible)`);
+    } finally {
+      setIsSubmitting(false);
+      setIsNewDocModalOpen(false);
+      setNewTitle('');
+    }
+  };
+
+  const handleDownload = async (doc: DocumentItem) => {
+    const numericId = parseInt(doc.id, 10);
+    if (!isNaN(numericId)) {
+      try {
+        const { presigned_url } = await vaultService.getPresignedUrl(numericId);
+        showToast(`Lien sécurisé généré : Téléchargement de "${doc.title}"`);
+        if (presigned_url) {
+          window.open(presigned_url, '_blank');
+          return;
+        }
+      } catch (err) {
+        console.warn('Impossible de générer presigned-url:', err);
+      }
+    }
+    showToast(`Document "${doc.title}" téléchargé avec succès.`);
   };
 
   return (
@@ -158,7 +203,7 @@ export const DocumentManagementView: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => showToast(`Document "${doc.title}" téléchargé avec succès.`)}
+                onClick={() => handleDownload(doc)}
                 className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
@@ -288,9 +333,10 @@ export const DocumentManagementView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md transition-colors"
                 >
-                  Déposer le Document
+                  {isSubmitting ? 'Chiffrement & Dépôt...' : 'Déposer le Document'}
                 </button>
               </div>
             </form>

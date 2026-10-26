@@ -1,9 +1,9 @@
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 from apps.hr_contracts.models import (
     HRContract, ContractType, HRContractStatus,
     LeaveRequest, LeaveType, LeaveStatus,
-    StaffReplacement
+    StaffReplacement, ClubStaffMember
 )
 from apps.vault.models import VaultDocument
 
@@ -82,3 +82,28 @@ def assign_staff_replacement(
         leave_request=leave_request,
         notes=notes
     )
+
+
+def create_club_staff_member(
+    name: str,
+    role: str,
+    department: str,
+    email: str,
+    phone: str = '',
+    contract_type: str = 'CDI',
+    qualifications: Optional[List[str]] = None,
+    assigned_teams: Optional[List[str]] = None,
+    access_level: str = 'Coach'
+) -> ClubStaffMember:
+    return ClubStaffMember.objects.create(
+        name=name,
+        role=role,
+        department=department,
+        email=email,
+        phone=phone,
+        contract_type=contract_type,
+        qualifications=qualifications or [],
+        assigned_teams=assigned_teams or [],
+        access_level=access_level,
+    )
+

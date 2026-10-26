@@ -65,30 +65,32 @@ export const ProcurementView: React.FC = () => {
     try {
       const created = await procurementService.createPurchaseOrder(payload);
       setPurchaseOrders(prev => [created, ...prev]);
-      showToast(`Bon de commande ${created.code} créé avec succès !`);
-    } catch (err) {
+      showToast(`Bon de commande ${created.code} créé avec succès en base de données !`);
+    } catch (err: any) {
       console.error('Erreur création bon de commande backend:', err);
-      const orderCount = purchaseOrders.length + 1;
-      const newOrder: PurchaseOrder = {
-        id: `po-${Date.now()}`,
-        code: `BC-2025-${String(orderCount).padStart(3, '0')}`,
-        supplierName: payload.supplierName!,
-        category: payload.category!,
-        description: payload.description!,
-        requestedBy: payload.requestedBy!,
-        requestDate: newRequestDate,
-        totalAmountTTC: payload.totalAmountTTC!,
-        status: payload.status!,
-        invoiceAttached: false,
-      };
-      setPurchaseOrders(prev => [newOrder, ...prev]);
-      showToast(`Bon de commande ${newOrder.code} créé (mode hors-ligne) !`);
+      showToast(err.message || 'Erreur lors de la création du bon de commande sur le serveur.');
     }
 
     setIsNewOrderModalOpen(false);
     setNewSupplier('');
     setNewDescription('');
     setNewAmountTTC(200);
+  };
+
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadPDF = async (order: PurchaseOrder) => {
+    try {
+      setDownloadingId(order.id);
+      showToast(`Génération du PDF pour ${order.code}...`);
+      await procurementService.downloadPurchaseOrderPDF(order.id, order.code);
+      showToast(`Bon de commande ${order.code} téléchargé avec succès !`);
+    } catch (err: any) {
+      console.error('Erreur téléchargement bon de commande PDF:', err);
+      showToast(err.message || 'Erreur lors du téléchargement du PDF.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -177,7 +179,7 @@ export const ProcurementView: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {order.status === 'En attente validation' ? (
+                          {order.status === 'En attente validation' && (
                             <button
                               type="button"
                               onClick={() => handleValidateOrder(order.id)}
@@ -185,16 +187,16 @@ export const ProcurementView: React.FC = () => {
                             >
                               Valider Achat
                             </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => showToast(`Bon de commande ${order.code} téléchargé en PDF.`)}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-                              title="Télécharger le bon de commande"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
                           )}
+                          <button
+                            type="button"
+                            disabled={downloadingId === order.id}
+                            onClick={() => handleDownloadPDF(order)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors disabled:opacity-50"
+                            title="Télécharger le bon de commande en PDF"
+                          >
+                            <Download className={`w-4 h-4 ${downloadingId === order.id ? 'animate-bounce text-blue-600' : ''}`} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteOrder(order.id)}

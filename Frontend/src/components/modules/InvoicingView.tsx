@@ -13,11 +13,13 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { Invoice } from '../../types';
+import { invoicingService } from '../../services/financeService';
 
 export const InvoicingView: React.FC = () => {
   const { invoices, setInvoices, showToast } = useClub();
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(invoices[0] || null);
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Invoice Form State
   const [newClientName, setNewClientName] = useState('');
@@ -36,7 +38,16 @@ export const InvoicingView: React.FC = () => {
     showToast(`Email de relance automatique avec RIB officiel transmis à ${clientName} !`);
   };
 
-  const handleMarkPaid = (invoiceId: string) => {
+  const handleMarkPaid = async (invoiceId: string) => {
+    const numericId = parseInt(invoiceId, 10);
+    if (!isNaN(numericId)) {
+      try {
+        await invoicingService.markPaid(numericId);
+      } catch (err) {
+        console.warn('Erreur règlement facture backend:', err);
+      }
+    }
+
     setInvoices(prev =>
       prev.map(inv => (inv.id === invoiceId ? { ...inv, status: 'Payée' } : inv))
     );
@@ -46,15 +57,17 @@ export const InvoicingView: React.FC = () => {
     showToast('Facture marquée comme réglée et enregistrée en comptabilité !');
   };
 
-  const handleCreateInvoice = (e: React.FormEvent) => {
+  const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClientName.trim()) {
       showToast('Veuillez renseigner le nom du client ou partenaire.');
       return;
     }
 
-    const nextNumber = `FAC-2025-${String(invoices.length + 1).padStart(3, '0')}`;
-    const newInv: Invoice = {
+    setIsSubmitting(true);
+
+    const nextNumber = `FAC-2026-${String(invoices.length + 1).padStart(3, '0')}`;
+    const fallbackInv: Invoice = {
       id: `inv-${Date.now()}`,
       number: nextNumber,
       clientName: newClientName.trim(),
@@ -67,14 +80,37 @@ export const InvoicingView: React.FC = () => {
       recipientEmail: newEmail.trim() || `contact@${newClientName.toLowerCase().replace(/[^a-z0-9]/g, '')}.fr`,
     };
 
-    setInvoices(prev => [newInv, ...prev]);
-    setSelectedInvoice(newInv);
-    setIsNewInvoiceModalOpen(false);
-    showToast(`Facture ${newInv.number} (${newInv.amountTTC.toLocaleString('fr-FR')} € TTC) créée pour ${newInv.clientName} !`);
+    let backendStatus: 'draft' | 'sent' | 'paid' = 'sent';
+    if (newStatus === 'Payée') backendStatus = 'paid';
 
-    // Reset
-    setNewClientName('');
-    setNewEmail('');
+    try {
+      const createdInv = await invoicingService.createInvoice({
+        club_id: 1,
+        number: nextNumber,
+        client_name: newClientName.trim(),
+        client_email: fallbackInv.recipientEmail,
+        issue_date: newIssueDate,
+        due_date: newDueDate,
+        amount_excl_tax: Number(newAmountHT) || 0,
+        tax_rate: 20.0,
+        status: backendStatus,
+        notes: `Prestation: ${newType}`,
+      });
+
+      setInvoices(prev => [createdInv, ...prev]);
+      setSelectedInvoice(createdInv);
+      showToast(`Facture ${createdInv.number} (${createdInv.amountTTC.toLocaleString('fr-FR')} € TTC) créée et synchronisée !`);
+    } catch (err) {
+      console.warn('Erreur création facture backend, fallback local:', err);
+      setInvoices(prev => [fallbackInv, ...prev]);
+      setSelectedInvoice(fallbackInv);
+      showToast(`Facture ${fallbackInv.number} créée en mode local.`);
+    } finally {
+      setIsSubmitting(false);
+      setIsNewInvoiceModalOpen(false);
+      setNewClientName('');
+      setNewEmail('');
+    }
   };
 
   return (
@@ -394,9 +430,10 @@ export const InvoicingView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md transition-colors"
                 >
-                  Générer la Facture
+                  {isSubmitting ? 'Émission Facture...' : 'Générer la Facture'}
                 </button>
               </div>
             </form>

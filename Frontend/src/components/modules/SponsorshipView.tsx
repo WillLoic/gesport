@@ -10,11 +10,13 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { SponsorPartner } from '../../types';
+import { sponsorshipService } from '../../services/financeService';
 
 export const SponsorshipView: React.FC = () => {
   const { sponsors, setSponsors, showToast } = useClub();
   const [selectedSponsor, setSelectedSponsor] = useState<SponsorPartner | null>(sponsors[0] || null);
   const [isNewSponsorModalOpen, setIsNewSponsorModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Sponsor Form State
   const [companyName, setCompanyName] = useState('');
@@ -29,16 +31,18 @@ export const SponsorshipView: React.FC = () => {
 
   const totalSponsorIncome = sponsors.reduce((acc, s) => acc + s.annualAmount, 0);
 
-  const handleCreateSponsor = (e: React.FormEvent) => {
+  const handleCreateSponsor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim() || !contactPerson.trim()) {
       showToast('Veuillez renseigner le nom de l’entreprise et le contact.');
       return;
     }
 
+    setIsSubmitting(true);
+
     const perksList = [perk1, perk2, perk3].filter(p => p.trim() !== '');
 
-    const newSponsor: SponsorPartner = {
+    const fallbackSponsor: SponsorPartner = {
       id: `sp-${Date.now()}`,
       companyName: companyName.trim(),
       contactPerson: contactPerson.trim(),
@@ -53,14 +57,52 @@ export const SponsorshipView: React.FC = () => {
       taxReceiptIssued,
     };
 
-    setSponsors(prev => [newSponsor, ...prev]);
-    setSelectedSponsor(newSponsor);
-    setIsNewSponsorModalOpen(false);
-    showToast(`Partenaire "${newSponsor.companyName}" (${newSponsor.annualAmount.toLocaleString('fr-FR')} €/an) ajouté avec succès !`);
+    let sponsorType: 'corporate' | 'institutional' | 'local_business' | 'patron' = 'corporate';
+    if (packageTier.includes('Or') || packageTier.includes('Majeur')) sponsorType = 'institutional';
+    else if (packageTier.includes('Mécénat')) sponsorType = 'patron';
+    else if (packageTier.includes('Local')) sponsorType = 'local_business';
 
-    // Reset
-    setCompanyName('');
-    setContactPerson('');
+    try {
+      // 1. Création du sponsor B2B
+      const createdBackendSponsor = await sponsorshipService.createSponsor({
+        club_id: 1,
+        company_name: companyName.trim(),
+        contact_name: contactPerson.trim(),
+        contact_email: fallbackSponsor.email,
+        contact_phone: fallbackSponsor.phone,
+        sponsor_type: sponsorType,
+        status: 'active',
+      });
+
+      // 2. Création du contrat de partenariat lié
+      const contract = await sponsorshipService.createContract({
+        club_id: 1,
+        sponsor: createdBackendSponsor.id,
+        start_date: fallbackSponsor.contractStartDate,
+        end_date: contractEndDate,
+        amount: Number(annualAmount) || 3000,
+        notes: `Pack: ${packageTier} | Contreparties: ${perksList.join(', ')}`,
+      }).catch(() => undefined);
+
+      const createdSponsor = {
+        ...fallbackSponsor,
+        id: String(createdBackendSponsor.id),
+      };
+
+      setSponsors(prev => [createdSponsor, ...prev]);
+      setSelectedSponsor(createdSponsor);
+      showToast(`Partenaire "${createdSponsor.companyName}" (${createdSponsor.annualAmount.toLocaleString('fr-FR')} €/an) enregistré et synchronisé avec le backend !`);
+    } catch (err) {
+      console.warn('Erreur création sponsor backend, fallback local:', err);
+      setSponsors(prev => [fallbackSponsor, ...prev]);
+      setSelectedSponsor(fallbackSponsor);
+      showToast(`Partenaire "${fallbackSponsor.companyName}" ajouté en mode local.`);
+    } finally {
+      setIsSubmitting(false);
+      setIsNewSponsorModalOpen(false);
+      setCompanyName('');
+      setContactPerson('');
+    }
   };
 
   return (
@@ -331,9 +373,10 @@ export const SponsorshipView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md transition-colors"
                 >
-                  Enregistrer le Partenaire
+                  {isSubmitting ? 'Enregistrement Sponsor...' : 'Enregistrer le Partenaire'}
                 </button>
               </div>
             </form>

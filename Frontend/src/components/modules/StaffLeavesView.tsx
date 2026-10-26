@@ -9,10 +9,12 @@ import {
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { LeaveRequest } from '../../types';
+import { hrContractsService } from '../../services/documentsService';
 
 export const StaffLeavesView: React.FC = () => {
   const { leaves, setLeaves, staff, showToast } = useClub();
   const [isNewLeaveModalOpen, setIsNewLeaveModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Leave Form State
   const [selectedStaffId, setSelectedStaffId] = useState(staff[0]?.id || 's1');
@@ -25,19 +27,33 @@ export const StaffLeavesView: React.FC = () => {
   const [selectedSubstituteId, setSelectedSubstituteId] = useState(staff[1]?.id || staff[0]?.id || 's2');
   const [handledTeams, setHandledTeams] = useState('Équipe Pro, U18 France');
 
-  const handleApproveLeave = (leaveId: string) => {
+  const handleApproveLeave = async (leaveId: string) => {
+    const numericId = parseInt(leaveId, 10);
+    if (!isNaN(numericId)) {
+      try {
+        await hrContractsService.approveRejectLeave(numericId, true);
+      } catch (err) {
+        console.warn('Erreur validation congé backend:', err);
+      }
+    }
     setLeaves(prev =>
       prev.map(l => (l.id === leaveId ? { ...l, status: 'Approuvé' } : l))
     );
     showToast('Demande de congé approuvée et planning des remplaçants notifié !');
   };
 
-  const handleCreateLeave = (e: React.FormEvent) => {
+  const handleCreateLeave = async (e: React.FormEvent) => {
     e.preventDefault();
     const sourceStaff = staff.find(s => s.id === selectedStaffId) || staff[0];
     const subStaff = staff.find(s => s.id === selectedSubstituteId) || staff[1] || staff[0];
 
-    const newLeave: LeaveRequest = {
+    setIsSubmitting(true);
+
+    let backendType: 'PAID' | 'UNPAID' | 'SICK' | 'MATERNITY' = 'PAID';
+    if (leaveType === 'Arrêt Maladie') backendType = 'SICK';
+    else if (leaveType === 'Événement Familial') backendType = 'UNPAID';
+
+    const fallbackLeave: LeaveRequest = {
       id: `leave-${Date.now()}`,
       staffName: sourceStaff.name,
       role: sourceStaff.role,
@@ -50,9 +66,39 @@ export const StaffLeavesView: React.FC = () => {
       status: 'En attente',
     };
 
-    setLeaves(prev => [newLeave, ...prev]);
-    setIsNewLeaveModalOpen(false);
-    showToast(`Demande de congé enregistrée pour ${sourceStaff.name} (Remplacement : ${subStaff.name}) !`);
+    try {
+      const createdLeave = await hrContractsService.createLeave({
+        employee_name: sourceStaff.name,
+        employee_email: `${sourceStaff.name.toLowerCase().replace(/\s+/g, '.')}@gesport-club.com`,
+        start_date: startDate,
+        end_date: endDate,
+        leave_type: backendType,
+        reason: `Remplaçant: ${subStaff.name} | Équipes: ${handledTeams}`,
+      });
+
+      // Assigner le remplacement dans le microservice si possible
+      const numericId = parseInt(createdLeave.id, 10);
+      if (!isNaN(numericId)) {
+        await hrContractsService.createReplacement({
+          absent_employee_name: sourceStaff.name,
+          replacement_employee_name: subStaff.name,
+          start_date: startDate,
+          end_date: endDate,
+          leave_request: numericId,
+          notes: `Équipes prises en charge: ${handledTeams}`,
+        }).catch(() => null);
+      }
+
+      setLeaves(prev => [createdLeave, ...prev]);
+      showToast(`Demande de congé synchronisée dans le microservice RH pour ${sourceStaff.name} !`);
+    } catch (err) {
+      console.warn('Erreur création congé backend, fallback local:', err);
+      setLeaves(prev => [fallbackLeave, ...prev]);
+      showToast(`Demande de congé enregistrée pour ${sourceStaff.name} (Remplacement : ${subStaff.name}) !`);
+    } finally {
+      setIsSubmitting(false);
+      setIsNewLeaveModalOpen(false);
+    }
   };
 
   return (
@@ -288,9 +334,10 @@ export const StaffLeavesView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md transition-colors"
                 >
-                  Enregistrer l'Absence
+                  {isSubmitting ? 'Enregistrement RH...' : "Enregistrer l'Absence"}
                 </button>
               </div>
             </form>

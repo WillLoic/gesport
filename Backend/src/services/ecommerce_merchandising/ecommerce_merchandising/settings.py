@@ -7,7 +7,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-gesport-ecommerce-merchandising-secret-key-2026-local-dev')
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-gesport-super-secret-key-2026-prod-dev')
 
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 

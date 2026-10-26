@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare,
   Send,
@@ -10,15 +10,21 @@ import {
   Plus,
   X,
   Hash,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { useClub } from '../../context/ClubContext';
 import { ChatChannel, ChatMessage } from '../../types';
+import { chatService, createChatWebSocket } from '../../services/messagingService';
 
 export const InternalMessagingView: React.FC = () => {
   const { channels, setChannels, messages, setMessages, showToast } = useClub();
-  const [selectedChannelId, setSelectedChannelId] = useState<string>(channels[0]?.id || 'ch1');
+  const [selectedChannelId, setSelectedChannelId] = useState<string>(channels[0]?.id || '1');
   const [messageInput, setMessageInput] = useState('');
   const [isNewChannelModalOpen, setIsNewChannelModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isWsConnected, setIsWsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
   // New Channel Form State
   const [newChannelName, setNewChannelName] = useState('');
@@ -30,40 +36,110 @@ export const InternalMessagingView: React.FC = () => {
   const selectedChannel = channels.find(c => c.id === selectedChannelId) || channels[0];
   const channelMessages = messages.filter(m => m.channelId === selectedChannelId);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  // Chargement des messages lorsque le canal sélectionné change
+  useEffect(() => {
+    if (!selectedChannel) return;
+    const numericId = parseInt(selectedChannel.id, 10);
+    if (!isNaN(numericId)) {
+      chatService
+        .getChannelMessages(numericId)
+        .then((remoteMsgs) => {
+          if (remoteMsgs && remoteMsgs.length > 0) {
+            setMessages(prev => {
+              // Remplacer ou fusionner les messages de ce canal
+              const other = prev.filter(m => m.channelId !== selectedChannel.id);
+              return [...other, ...remoteMsgs];
+            });
+          }
+        })
+        .catch(() => null);
+    }
+  }, [selectedChannelId]);
+
+  // Connexion WebSocket temps réel sur le canal actif
+  useEffect(() => {
+    if (!selectedChannel) return;
+    const numericId = parseInt(selectedChannel.id, 10);
+    if (isNaN(numericId)) return;
+
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+
+    const socket = createChatWebSocket(numericId, {
+      onOpen: () => setIsWsConnected(true),
+      onClose: () => setIsWsConnected(false),
+      onError: () => setIsWsConnected(false),
+      onMessage: (newMsg) => {
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      },
+    });
+
+    wsRef.current = socket;
+
+    return () => {
+      socket?.close();
+    };
+  }, [selectedChannelId]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim() || !selectedChannel) return;
 
-    const newMsg: ChatMessage = {
+    const content = messageInput.trim();
+    setMessageInput('');
+
+    const fallbackMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       channelId: selectedChannel.id,
       senderName: 'Alexandre Laurent (Président)',
       senderRole: 'Président',
-      content: messageInput.trim(),
+      content,
       timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       attachments: hasAttachedFile
         ? [{ name: 'Planning-Offensive-Tactique.pdf', size: '2.1 MB', type: 'PDF' }]
         : undefined,
     };
 
-    setMessages(prev => [...prev, newMsg]);
-    setMessageInput('');
+    setMessages(prev => [...prev, fallbackMsg]);
     setHasAttachedFile(false);
-    showToast('Message diffusé sur le canal !');
+
+    const numericId = parseInt(selectedChannel.id, 10);
+    if (!isNaN(numericId)) {
+      try {
+        const sentMsg = await chatService.sendMessage(numericId, {
+          sender_id: 1,
+          sender_name: 'Alexandre Laurent (Président)',
+          content,
+          attachment_url: hasAttachedFile ? 'https://s3.local.gesport/vault/planning.pdf' : undefined,
+        });
+
+        // Remplacer le message fallback par celui confirmé par le backend
+        setMessages(prev => prev.map(m => (m.id === fallbackMsg.id ? sentMsg : m)));
+        showToast('Message diffusé sur le canal !');
+      } catch (err) {
+        console.warn('Erreur envoi message backend, mode local conservé:', err);
+      }
+    }
   };
 
-  const handleCreateChannel = (e: React.FormEvent) => {
+  const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChannelName.trim()) {
       showToast('Veuillez renseigner le nom du canal.');
       return;
     }
 
+    setIsSubmitting(true);
+
     const formattedName = newChannelName.startsWith('#')
       ? newChannelName.trim()
       : `#${newChannelName.trim().toLowerCase().replace(/\s+/g, '-')}`;
 
-    const newChan: ChatChannel = {
+    const fallbackChan: ChatChannel = {
       id: `ch-${Date.now()}`,
       name: formattedName,
       description: newDescription.trim() || 'Canal d’échange interne.',
@@ -73,14 +149,34 @@ export const InternalMessagingView: React.FC = () => {
       unreadCount: 0,
     };
 
-    setChannels(prev => [newChan, ...prev]);
-    setSelectedChannelId(newChan.id);
-    setIsNewChannelModalOpen(false);
-    showToast(`Canal "${newChan.name}" créé avec succès !`);
+    let channelType: 'PUBLIC' | 'PRIVATE' | 'TEAM' = 'PUBLIC';
+    if (newCategory.includes('Équipes')) channelType = 'TEAM';
+    else if (newCategory.includes('Staff')) channelType = 'PRIVATE';
 
-    // Reset
-    setNewChannelName('');
-    setNewDescription('');
+    try {
+      const createdChan = await chatService.createChannel({
+        club_id: 1,
+        name: formattedName,
+        description: newDescription.trim(),
+        channel_type: channelType,
+        creator_id: 1,
+        creator_name: 'Alexandre Laurent',
+      });
+
+      setChannels(prev => [createdChan, ...prev]);
+      setSelectedChannelId(createdChan.id);
+      showToast(`Canal "${createdChan.name}" créé et synchronisé avec le microservice !`);
+    } catch (err) {
+      console.warn('Erreur création canal backend, mode local:', err);
+      setChannels(prev => [fallbackChan, ...prev]);
+      setSelectedChannelId(fallbackChan.id);
+      showToast(`Canal "${fallbackChan.name}" créé en mode local.`);
+    } finally {
+      setIsSubmitting(false);
+      setIsNewChannelModalOpen(false);
+      setNewChannelName('');
+      setNewDescription('');
+    }
   };
 
   return (
@@ -178,9 +274,20 @@ export const InternalMessagingView: React.FC = () => {
                 <p className="text-xs text-slate-500 mt-0.5">{selectedChannel.description}</p>
               </div>
 
-              <div className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                <Users className="w-4 h-4 text-slate-500" />
-                {selectedChannel.membersCount} membres
+              <div className="flex items-center gap-3">
+                {isWsConnected ? (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    <Wifi className="w-3 h-3 text-emerald-600 animate-pulse" /> En direct (WebSocket)
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    <WifiOff className="w-3 h-3 text-slate-400" /> Mode standard (REST)
+                  </span>
+                )}
+                <div className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                  <Users className="w-4 h-4 text-slate-500" />
+                  {selectedChannel.membersCount} membres
+                </div>
               </div>
             </div>
           )}
@@ -350,9 +457,10 @@ export const InternalMessagingView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md transition-colors"
                 >
-                  Créer le Canal
+                  {isSubmitting ? 'Création du canal...' : 'Créer le Canal'}
                 </button>
               </div>
             </form>

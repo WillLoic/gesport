@@ -19,9 +19,17 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/vault/', include('apps.vault.urls')),
-    path('api/governance/', include('apps.governance.urls')),
-    path('api/hr-contracts/', include('apps.hr_contracts.urls')),
-    path('api/signatures/', include('apps.signatures.urls')),
+
+    # Endpoints v1 (routage via API Gateway Nginx)
+    path('api/v1/vault/', include('apps.vault.urls')),
+    path('api/v1/governance/', include('apps.governance.urls')),
+    path('api/v1/hr-contracts/', include('apps.hr_contracts.urls')),
+    path('api/v1/signatures/', include('apps.signatures.urls')),
+
+    # Compatibilité directe /api/
+    # path('api/vault/', include('apps.vault.urls')),
+    # path('api/governance/', include('apps.governance.urls')),
+    # path('api/hr-contracts/', include('apps.hr_contracts.urls')),
+    # path('api/signatures/', include('apps.signatures.urls')),
 ]
 

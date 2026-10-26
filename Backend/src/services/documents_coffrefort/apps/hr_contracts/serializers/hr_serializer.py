@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.hr_contracts.models import HRContract, LeaveRequest, StaffReplacement
+from apps.hr_contracts.models import HRContract, LeaveRequest, StaffReplacement, ClubStaffMember
 
 
 class StaffReplacementSerializer(serializers.ModelSerializer):
@@ -27,3 +27,15 @@ class HRContractSerializer(serializers.ModelSerializer):
             'status', 'vault_document', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ClubStaffMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClubStaffMember
+        fields = [
+            'id', 'name', 'role', 'department', 'email', 'phone',
+            'contract_type', 'qualifications', 'assigned_teams',
+            'access_level', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
