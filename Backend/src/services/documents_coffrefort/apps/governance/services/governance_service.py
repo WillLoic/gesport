@@ -22,6 +22,28 @@ def create_assembly(
     )
 
 
+def update_assembly(
+    assembly: GeneralAssembly,
+    title: Optional[str] = None,
+    scheduled_at=None,
+    assembly_type: Optional[str] = None,
+    location: Optional[str] = None,
+    status: Optional[str] = None,
+) -> GeneralAssembly:
+    if title is not None:
+        assembly.title = title
+    if scheduled_at is not None:
+        assembly.scheduled_at = scheduled_at
+    if assembly_type is not None:
+        assembly.assembly_type = assembly_type
+    if location is not None:
+        assembly.location = location
+    if status is not None:
+        assembly.status = status
+    assembly.save()
+    return assembly
+
+
 def send_convocations(assembly: GeneralAssembly, recipient_emails: List[str]) -> List[AssemblyConvocation]:
     convocations = []
     for email in recipient_emails:
@@ -42,12 +64,28 @@ def add_resolution(assembly: GeneralAssembly, title: str, description: str = '')
     )
 
 
-def vote_on_resolution(resolution: Resolution, votes_for: int, votes_against: int, votes_abstain: int) -> Resolution:
-    resolution.votes_for += votes_for
-    resolution.votes_against += votes_against
-    resolution.votes_abstain += votes_abstain
+def vote_on_resolution(
+    resolution: Resolution,
+    votes_for: Optional[int] = None,
+    votes_against: Optional[int] = None,
+    votes_abstain: Optional[int] = None,
+    vote_type: Optional[str] = None,
+) -> Resolution:
+    if vote_type == 'pour':
+        resolution.votes_for += 1
+    elif vote_type == 'contre':
+        resolution.votes_against += 1
+    elif vote_type == 'abstention':
+        resolution.votes_abstain += 1
+    else:
+        if votes_for is not None:
+            resolution.votes_for = votes_for
+        if votes_against is not None:
+            resolution.votes_against = votes_against
+        if votes_abstain is not None:
+            resolution.votes_abstain = votes_abstain
 
-    if resolution.votes_for > resolution.votes_against:
+    if resolution.votes_for >= resolution.votes_against:
         resolution.status = ResolutionStatus.PASSED
     else:
         resolution.status = ResolutionStatus.REJECTED

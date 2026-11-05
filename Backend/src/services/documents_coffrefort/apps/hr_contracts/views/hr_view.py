@@ -11,9 +11,10 @@ from apps.hr_contracts.selectors.hr_selector import (
     get_all_club_staff, get_club_staff_by_id
 )
 from apps.hr_contracts.services.hr_service import (
-    create_hr_contract, terminate_hr_contract, create_leave_request,
-    approve_or_reject_leave, assign_staff_replacement,
-    create_club_staff_member
+    create_hr_contract, update_hr_contract, renew_hr_contract,
+    terminate_hr_contract, create_leave_request, update_leave_request,
+    complete_leave_request, approve_or_reject_leave, assign_staff_replacement,
+    create_club_staff_member, update_club_staff_member
 )
 from apps.vault.selectors.vault_selector import get_document_by_id
 
@@ -51,6 +52,45 @@ class HRContractDetailView(APIView):
         if not contract:
             return Response({'error': 'Contrat non trouvé'}, status=status.HTTP_404_NOT_FOUND)
         return Response(HRContractSerializer(contract).data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        contract = get_hr_contract_by_id(pk)
+        if not contract:
+            return Response({'error': 'Contrat non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = HRContractSerializer(contract, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
+
+    def delete(self, request, pk):
+        contract = get_hr_contract_by_id(pk)
+        if not contract:
+            return Response({'error': 'Contrat non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        contract.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HRContractRenewView(APIView):
+    def post(self, request, pk):
+        contract = get_hr_contract_by_id(pk)
+        if not contract:
+            return Response({'error': 'Contrat non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        new_end_date = request.data.get('end_date')
+        if not new_end_date:
+            return Response({'error': 'La date de fin prévisionnelle est requise'}, status=status.HTTP_400_BAD_REQUEST)
+        salary_monthly = request.data.get('salary_monthly')
+        contract_type = request.data.get('contract_type')
+        updated_contract = renew_hr_contract(
+            contract,
+            new_end_date=new_end_date,
+            salary_monthly=salary_monthly,
+            contract_type=contract_type
+        )
+        return Response(HRContractSerializer(updated_contract).data, status=status.HTTP_200_OK)
 
 
 class HRContractTerminateView(APIView):
@@ -92,6 +132,48 @@ class LeaveRequestApproveRejectView(APIView):
         approve = request.data.get('approve', True)
         manager = request.data.get('manager_name', 'RH Manager')
         updated_leave = approve_or_reject_leave(leave, approve=approve, manager_name=manager)
+        return Response(LeaveRequestSerializer(updated_leave).data, status=status.HTTP_200_OK)
+
+
+class LeaveRequestDetailView(APIView):
+    def get(self, request, pk):
+        leave = get_leave_request_by_id(pk)
+        if not leave:
+            return Response({'error': 'Demande de congé non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(LeaveRequestSerializer(leave).data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        leave = get_leave_request_by_id(pk)
+        if not leave:
+            return Response({'error': 'Demande de congé non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = LeaveRequestSerializer(leave, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            status_val = request.data.get('status')
+            if status_val:
+                leave.status = status_val
+                leave.save()
+            return Response(LeaveRequestSerializer(leave).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
+
+    def delete(self, request, pk):
+        leave = get_leave_request_by_id(pk)
+        if not leave:
+            return Response({'error': 'Demande de congé non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        leave.replacements.all().delete()
+        leave.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LeaveRequestCompleteView(APIView):
+    def post(self, request, pk):
+        leave = get_leave_request_by_id(pk)
+        if not leave:
+            return Response({'error': 'Demande de congé non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        updated_leave = complete_leave_request(leave)
         return Response(LeaveRequestSerializer(updated_leave).data, status=status.HTTP_200_OK)
 
 
@@ -147,6 +229,30 @@ class ClubStaffMemberDetailView(APIView):
         if not member:
             return Response({'error': 'Membre du staff non trouvé'}, status=status.HTTP_404_NOT_FOUND)
         return Response(ClubStaffMemberSerializer(member).data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        member = get_club_staff_by_id(pk)
+        if not member:
+            return Response({'error': 'Membre du staff non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ClubStaffMemberSerializer(data=request.data, partial=True)
+        if serializer.is_valid():
+            updated = update_club_staff_member(
+                member=member,
+                name=serializer.validated_data.get('name'),
+                role=serializer.validated_data.get('role'),
+                department=serializer.validated_data.get('department'),
+                email=serializer.validated_data.get('email'),
+                phone=serializer.validated_data.get('phone'),
+                contract_type=serializer.validated_data.get('contract_type'),
+                qualifications=serializer.validated_data.get('qualifications'),
+                assigned_teams=serializer.validated_data.get('assigned_teams'),
+                access_level=serializer.validated_data.get('access_level'),
+            )
+            return Response(ClubStaffMemberSerializer(updated).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
 
     def delete(self, request, pk):
         member = get_club_staff_by_id(pk)

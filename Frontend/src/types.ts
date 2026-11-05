@@ -85,16 +85,17 @@ export interface StaffMember {
   id: string;
   name: string;
   role: string;
-  department: 'Direction & Bureau' | 'Staff Technique' | 'Pôle Médical & Santé' | 'Logistique & Équipement' | 'Communication & Événements';
+  department: string;
   email: string;
   phone: string;
-  contractType: 'CDI' | 'CDD Sportif' | 'Vacataire' | 'Bénévole' | 'Prestataire' | 'Service Civique';
+  contractType: string;
   contractEndDate?: string;
   qualifications: string[];
   assignedTeams: string[];
-  accessLevel: 'Admin Total' | 'Coach & Sport' | 'Comptabilité' | 'Médical Strict' | 'Consultation';
+  accessLevel: string;
   avatarUrl?: string;
 }
+
 
 export interface Team {
   id: string;
@@ -306,28 +307,32 @@ export interface PosOrder {
 export interface DocumentItem {
   id: string;
   title: string;
-  category: 'Statuts & AG' | 'Assurances & Sécurité' | 'Règlements & Chartes' | 'Conventions Mairie' | 'Formulaires Licences' | 'Comptabilité';
-  fileType: 'PDF' | 'DOCX' | 'XLSX';
+  category: 'Statuts & AG' | 'Assurances & Sécurité' | 'Règlements & Chartes' | 'Conventions Mairie' | 'Formulaires Licences' | 'Comptabilité' | string;
+  fileType: 'PDF' | 'DOCX' | 'XLSX' | 'ZIP' | 'SCAN' | 'IMAGE' | 'VIDEO' | 'AUDIO' | string;
   fileSize: string;
   uploadDate: string;
   author: string;
-  accessRole: 'Tous' | 'Staff & Bureau' | 'Bureau Seul';
+  accessRole: 'Tous' | 'Staff & Bureau' | 'Bureau Seul' | string;
   downloadUrl?: string;
+  description?: string;
+  sha256?: string;
 }
 
 export interface ClubMeeting {
   id: string;
   title: string;
-  type: 'Bureau Directeur' | 'Assemblée Générale Ordinaire' | 'AG Extraordinaire' | 'Comité Technique' | 'Commission Discipline';
+  type: string;
   date: string;
   time: string;
   location: string;
   quorumNeeded: number;
   attendeesCount: number;
-  status: 'Planifiée' | 'En cours' | 'Clôturée';
+  status: string;
   agendaItems: string[];
   votes: {
+    id?: number | string;
     resolution: string;
+    description?: string;
     votesFor: number;
     votesAgainst: number;
     abstentions: number;
@@ -340,12 +345,12 @@ export interface StaffContract {
   id: string;
   staffName: string;
   role: string;
-  contractType: 'CDI' | 'CDD Sportif' | 'Vacataire' | 'Indépendant' | 'Service Civique';
+  contractType: string;
   monthlyGrossSalary: number;
   weeklyHours: number;
   startDate: string;
   endDate?: string;
-  status: 'Actif' | 'Renouvellement proche (<30j)' | 'Échu' | 'Archivé';
+  status: string;
   alertDaysLeft?: number;
 }
 
@@ -353,13 +358,13 @@ export interface LeaveRequest {
   id: string;
   staffName: string;
   role: string;
-  leaveType: 'Congés Payés' | 'Arrêt Maladie' | 'Formation Fédérale' | 'Événement Familial';
+  leaveType: string;
   startDate: string;
   endDate: string;
   daysCount: number;
   substituteStaffName: string;
   substituteHandledTeams: string[];
-  status: 'En attente' | 'Approuvé' | 'Refusé';
+  status: 'En attente' | 'Approuvé' | 'Refusé' | 'Terminé' | string;
 }
 
 export interface FinancialTransaction {

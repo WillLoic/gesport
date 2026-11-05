@@ -11,13 +11,25 @@ class DocumentAccessLogSerializer(serializers.ModelSerializer):
 
 class VaultDocumentSerializer(serializers.ModelSerializer):
     access_logs = DocumentAccessLogSerializer(many=True, read_only=True)
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
         model = VaultDocument
         fields = [
-            'id', 'title', 'description', 'file_path_or_s3_key', 'file_size',
+            'id', 'title', 'description', 'file_path_or_s3_key', 'file_url', 'file_size',
             'mime_type', 'sha256_hash', 'confidentiality_level', 'is_encrypted',
             'encryption_algorithm', 'uploaded_by', 'created_at', 'updated_at',
             'access_logs'
         ]
-        read_only_fields = ['id', 'sha256_hash', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'sha256_hash', 'created_at', 'updated_at', 'file_url']
+
+    def get_file_url(self, obj):
+        path = obj.file_path_or_s3_key or ''
+        if not path:
+            return None
+        if path.startswith(('http://', 'https://')):
+            return path
+        if path.startswith('s3://'):
+            return path.replace('s3://gesport-vault/', 'https://gesport-vault.s3.eu-west-3.amazonaws.com/')
+        # Local development media serving
+        return f"http://localhost:8007/media/{path}"

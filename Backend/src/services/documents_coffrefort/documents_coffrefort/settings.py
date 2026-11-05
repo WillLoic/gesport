@@ -138,6 +138,19 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# ==========================================================================
+# MEDIA FILES — Stockage local (dev) / S3 (prod)
+# En dev  : les fichiers sont stockés dans BASE_DIR/media/
+#           et servis via http://localhost:8007/media/<path>
+# En prod : remplacer DEFAULT_FILE_STORAGE par S3Boto3Storage
+#           et définir AWS_STORAGE_BUCKET_NAME, AWS_S3_REGION_NAME etc.
+# ==========================================================================
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Sous-dossiers de stockage par type de document
+VAULT_UPLOAD_TO = 'vault_documents/'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

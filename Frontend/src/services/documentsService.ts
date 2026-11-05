@@ -1,5 +1,5 @@
 import { apiFetch } from './apiClient';
-import { DocumentItem, ClubMeeting, StaffContract, LeaveRequest } from '../types';
+import { DocumentItem, ClubMeeting, StaffContract, LeaveRequest, StaffMember } from '../types';
 
 // ═══════════════════════════════════════════════════════════════════
 //  INTERFACES BACKEND (Documents & Coffre-Fort Django Microservice)
@@ -10,6 +10,7 @@ export interface BackendVaultDocument {
   title: string;
   description: string;
   file_path_or_s3_key: string;
+  file_url?: string;
   file_size: number;
   mime_type: string;
   sha256_hash: string;
@@ -83,10 +84,10 @@ export interface BackendLeaveRequest {
   id: number;
   employee_name: string;
   employee_email: string;
-  leave_type: 'PAID' | 'UNPAID' | 'SICK' | 'MATERNITY';
+  leave_type: 'PAID' | 'UNPAID' | 'SICK' | 'MATERNITY' | string;
   start_date: string;
   end_date: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | string;
   reason: string;
   approved_by: string;
   created_at: string;
@@ -147,11 +148,17 @@ export function formatFileSize(bytes: number): string {
 }
 
 export function mapBackendDocToFrontend(doc: BackendVaultDocument): DocumentItem {
-  // Déterminer l'extension
-  const lowerPath = (doc.file_path_or_s3_key || '').toLowerCase();
+  // Déterminer le type de média
+  const lowerPath = ((doc.file_path_or_s3_key || '') + ' ' + (doc.title || '') + ' ' + (doc.mime_type || '')).toLowerCase();
   let fileType: DocumentItem['fileType'] = 'PDF';
-  if (lowerPath.endsWith('.docx') || lowerPath.endsWith('.doc')) fileType = 'DOCX';
-  else if (lowerPath.endsWith('.xlsx') || lowerPath.endsWith('.xls')) fileType = 'XLSX';
+  if (lowerPath.includes('.pdf') || lowerPath.includes('application/pdf')) fileType = 'PDF';
+  else if (lowerPath.includes('.docx') || lowerPath.includes('.doc') || lowerPath.includes('word')) fileType = 'DOCX';
+  else if (lowerPath.includes('.xlsx') || lowerPath.includes('.xls') || lowerPath.includes('.csv') || lowerPath.includes('spreadsheet') || lowerPath.includes('excel')) fileType = 'XLSX';
+  else if (lowerPath.includes('.zip') || lowerPath.includes('.rar') || lowerPath.includes('.7z') || lowerPath.includes('.tar') || lowerPath.includes('.gz') || lowerPath.includes('zip')) fileType = 'ZIP';
+  else if (lowerPath.includes('.png') || lowerPath.includes('.jpg') || lowerPath.includes('.jpeg') || lowerPath.includes('.webp') || lowerPath.includes('.gif') || lowerPath.includes('image/')) fileType = 'IMAGE';
+  else if (lowerPath.includes('.mp4') || lowerPath.includes('.mov') || lowerPath.includes('.avi') || lowerPath.includes('.mkv') || lowerPath.includes('.webm') || lowerPath.includes('video/')) fileType = 'VIDEO';
+  else if (lowerPath.includes('.mp3') || lowerPath.includes('.wav') || lowerPath.includes('.ogg') || lowerPath.includes('.m4a') || lowerPath.includes('audio/')) fileType = 'AUDIO';
+  else if (lowerPath.includes('scan')) fileType = 'SCAN';
 
   // Role mapping
   let accessRole: DocumentItem['accessRole'] = 'Staff & Bureau';
@@ -175,6 +182,18 @@ export function mapBackendDocToFrontend(doc: BackendVaultDocument): DocumentItem
     }
   }
 
+  // URL directe de téléchargement ou affichage
+  let downloadUrl = doc.file_url;
+  if (!downloadUrl && doc.file_path_or_s3_key) {
+    if (doc.file_path_or_s3_key.startsWith('http://') || doc.file_path_or_s3_key.startsWith('https://')) {
+      downloadUrl = doc.file_path_or_s3_key;
+    } else if (doc.file_path_or_s3_key.startsWith('s3://')) {
+      downloadUrl = doc.file_path_or_s3_key.replace('s3://gesport-vault/', 'https://gesport-vault.s3.eu-west-3.amazonaws.com/');
+    } else {
+      downloadUrl = `http://localhost:8007/media/${doc.file_path_or_s3_key}`;
+    }
+  }
+
   return {
     id: String(doc.id),
     title: doc.title,
@@ -184,7 +203,9 @@ export function mapBackendDocToFrontend(doc: BackendVaultDocument): DocumentItem
     uploadDate: doc.created_at ? doc.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
     author: doc.uploaded_by || 'Secrétaire Général',
     accessRole,
-    downloadUrl: doc.file_path_or_s3_key,
+    downloadUrl,
+    description: doc.description,
+    sha256: doc.sha256_hash,
   };
 }
 
@@ -202,7 +223,9 @@ export function mapBackendAssemblyToFrontend(assembly: BackendGeneralAssembly): 
   const time = scheduled.split('T')[1]?.slice(0, 5) || '19:00';
 
   const votes = (assembly.resolutions || []).map((r) => ({
+    id: r.id,
     resolution: r.title,
+    description: r.description,
     votesFor: r.votes_for,
     votesAgainst: r.votes_against,
     abstentions: r.votes_abstain,
@@ -236,8 +259,20 @@ export function mapBackendContractToFrontend(contract: BackendHRContract): Staff
   else if (contract.contract_type === 'BENEVOLAT') contractType = 'Service Civique';
 
   let status: StaffContract['status'] = 'Actif';
-  if (contract.status === 'TERMINATED' || contract.status === 'EXPIRED') status = 'Échu';
-  else if (contract.status === 'PENDING_SIGNATURE' || contract.status === 'DRAFT') status = 'Renouvellement proche (<30j)';
+  let alertDaysLeft: number | undefined;
+  if (contract.status === 'TERMINATED') {
+    status = 'Échu';
+  } else if (contract.status === 'EXPIRED') {
+    status = 'Échu';
+  } else if (contract.end_date) {
+    const end = new Date(contract.end_date).getTime();
+    const now = new Date().getTime();
+    const days = Math.round((end - now) / (1000 * 3600 * 24));
+    if (days >= 0 && days <= 60) {
+      alertDaysLeft = days;
+      status = 'Renouvellement proche (<30j)';
+    }
+  }
 
   return {
     id: String(contract.id),
@@ -249,6 +284,7 @@ export function mapBackendContractToFrontend(contract: BackendHRContract): Staff
     startDate: contract.start_date,
     endDate: contract.end_date || undefined,
     status,
+    alertDaysLeft,
   };
 }
 
@@ -260,6 +296,7 @@ export function mapBackendLeaveToFrontend(leave: BackendLeaveRequest): LeaveRequ
   let status: LeaveRequest['status'] = 'En attente';
   if (leave.status === 'APPROVED') status = 'Approuvé';
   else if (leave.status === 'REJECTED') status = 'Refusé';
+  else if (leave.status === 'COMPLETED') status = 'Terminé';
 
   const d1 = new Date(leave.start_date).getTime();
   const d2 = new Date(leave.end_date).getTime();
@@ -340,6 +377,41 @@ export const vaultService = {
   },
 
   /**
+   * Upload direct d'un fichier physique (multipart/form-data) vers le stockage local (ou S3 en prod)
+   */
+  async uploadDocument(formData: FormData): Promise<DocumentItem> {
+    const res = await apiFetch<BackendVaultDocument>('/vault/documents/upload/', {
+      method: 'POST',
+      body: formData,
+    });
+    return mapBackendDocToFrontend(res);
+  },
+
+  /**
+   * Met à jour les métadonnées d'un document
+   */
+  async updateDocument(id: number | string, data: {
+    title?: string;
+    description?: string;
+    confidentiality_level?: string;
+  }): Promise<DocumentItem> {
+    const res = await apiFetch<BackendVaultDocument>(`/vault/documents/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return mapBackendDocToFrontend(res);
+  },
+
+  /**
+   * Supprime un document (fichier physique et entrée BD)
+   */
+  async deleteDocument(id: number | string): Promise<void> {
+    await apiFetch(`/vault/documents/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
    * Récupère les logs d'accès à un document
    */
   async getAccessLogs(documentId: number | string) {
@@ -375,6 +447,32 @@ export const governanceService = {
   },
 
   /**
+   * Mettre à jour une Assemblée Générale / Réunion
+   */
+  async updateAssembly(id: number | string, data: {
+    title?: string;
+    scheduled_at?: string;
+    assembly_type?: 'ORDINARY' | 'EXTRAORDINARY' | 'SPECIAL' | string;
+    location?: string;
+    status?: string;
+  }): Promise<ClubMeeting> {
+    const res = await apiFetch<BackendGeneralAssembly>(`/governance/assemblies/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return mapBackendAssemblyToFrontend(res);
+  },
+
+  /**
+   * Supprimer une Assemblée Générale / Réunion
+   */
+  async deleteAssembly(id: number | string): Promise<void> {
+    await apiFetch(`/governance/assemblies/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
    * Ajoute une résolution à une AG
    */
   async addResolution(assemblyId: number | string, data: { title: string; description?: string }): Promise<BackendResolution> {
@@ -387,10 +485,18 @@ export const governanceService = {
   /**
    * Vote sur une résolution
    */
-  async voteResolution(resolutionId: number | string, votes: { votes_for: number; votes_against: number; votes_abstain?: number }): Promise<BackendResolution> {
+  async voteResolution(
+    resolutionId: number | string,
+    data: {
+      type?: 'pour' | 'contre' | 'abstention';
+      votes_for?: number;
+      votes_against?: number;
+      votes_abstain?: number;
+    }
+  ): Promise<BackendResolution> {
     return apiFetch<BackendResolution>(`/governance/resolutions/${resolutionId}/vote/`, {
       method: 'POST',
-      body: JSON.stringify(votes),
+      body: JSON.stringify(data),
     });
   },
 
@@ -436,6 +542,41 @@ export const hrContractsService = {
   },
 
   /**
+   * Mettre à jour un contrat de travail
+   */
+  async updateContract(id: number | string, data: {
+    employee_name?: string;
+    employee_email?: string;
+    position_title?: string;
+    start_date?: string;
+    end_date?: string | null;
+    contract_type?: string;
+    salary_monthly?: number;
+    status?: string;
+  }): Promise<StaffContract> {
+    const res = await apiFetch<BackendHRContract>(`/hr-contracts/contracts/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return mapBackendContractToFrontend(res);
+  },
+
+  /**
+   * Renouveler un contrat de travail (prolongation d'échéance et ajustement salarial)
+   */
+  async renewContract(id: number | string, data: {
+    end_date: string;
+    salary_monthly?: number;
+    contract_type?: string;
+  }): Promise<StaffContract> {
+    const res = await apiFetch<BackendHRContract>(`/hr-contracts/contracts/${id}/renew/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return mapBackendContractToFrontend(res);
+  },
+
+  /**
    * Résilier un contrat
    */
   async terminateContract(id: number | string, terminationDate?: string): Promise<StaffContract> {
@@ -444,6 +585,15 @@ export const hrContractsService = {
       body: JSON.stringify({ termination_date: terminationDate }),
     });
     return mapBackendContractToFrontend(res);
+  },
+
+  /**
+   * Supprimer un contrat de travail (rupture / suppression définitive)
+   */
+  async deleteContract(id: number | string): Promise<void> {
+    await apiFetch(`/hr-contracts/contracts/${id}/`, {
+      method: 'DELETE',
+    });
   },
 
   /**
@@ -482,6 +632,44 @@ export const hrContractsService = {
       body: JSON.stringify({ approve, manager_name: managerName }),
     });
     return mapBackendLeaveToFrontend(res);
+  },
+
+  /**
+   * Marquer un congé comme terminé (séjour/période d'absence achevée)
+   */
+  async completeLeave(id: number | string): Promise<LeaveRequest> {
+    const res = await apiFetch<BackendLeaveRequest>(`/hr-contracts/leaves/${id}/complete/`, {
+      method: 'POST',
+    });
+    return mapBackendLeaveToFrontend(res);
+  },
+
+  /**
+   * Mettre à jour une demande de congé
+   */
+  async updateLeave(id: number | string, data: {
+    employee_name?: string;
+    employee_email?: string;
+    start_date?: string;
+    end_date?: string;
+    leave_type?: string;
+    status?: string;
+    reason?: string;
+  }): Promise<LeaveRequest> {
+    const res = await apiFetch<BackendLeaveRequest>(`/hr-contracts/leaves/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return mapBackendLeaveToFrontend(res);
+  },
+
+  /**
+   * Supprimer une demande de congé
+   */
+  async deleteLeave(id: number | string): Promise<void> {
+    await apiFetch(`/hr-contracts/leaves/${id}/`, {
+      method: 'DELETE',
+    });
   },
 
   /**
@@ -554,3 +742,103 @@ export const signaturesService = {
     });
   },
 };
+
+// ═══════════════════════════════════════════════════════════════════
+//  INTERFACE BACKEND : Membres du Staff (ClubStaffMember)
+// ═══════════════════════════════════════════════════════════════════
+
+export interface BackendStaffMember {
+  id: number;
+  name: string;
+  role: string;
+  department: string;
+  email: string;
+  phone: string;
+  contract_type: string;
+  qualifications: string[];
+  assigned_teams: string[];
+  access_level: 'Admin' | 'Manager' | 'Coach' | 'Medical' | 'Staff';
+  created_at: string;
+  updated_at: string;
+}
+
+export function mapBackendStaffMemberToFrontend(member: BackendStaffMember): StaffMember {
+  return {
+    id: String(member.id),
+    name: member.name,
+    role: member.role,
+    department: member.department,
+    email: member.email,
+    phone: member.phone || '—',
+    contractType: member.contract_type || 'CDI',
+    qualifications: member.qualifications || [],
+    assignedTeams: member.assigned_teams || [],
+    accessLevel: member.access_level || 'Staff',
+  };
+}
+
+export const staffMemberService = {
+  /**
+   * Liste tous les membres du staff (filtrable par département)
+   */
+  async getStaffMembers(department?: string): Promise<StaffMember[]> {
+    const query = department ? `?department=${encodeURIComponent(department)}` : '';
+    const members = await apiFetch<BackendStaffMember[]>(`/hr-contracts/staff-members/${query}`);
+    return (members || []).map(mapBackendStaffMemberToFrontend);
+  },
+
+  /**
+   * Crée un nouveau membre du staff
+   */
+  async createStaffMember(data: {
+    name: string;
+    role: string;
+    department: string;
+    email: string;
+    phone?: string;
+    contract_type?: string;
+    qualifications?: string[];
+    assigned_teams?: string[];
+    access_level?: 'Admin' | 'Manager' | 'Coach' | 'Medical' | 'Staff';
+  }): Promise<StaffMember> {
+    const res = await apiFetch<BackendStaffMember>('/hr-contracts/staff-members/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return mapBackendStaffMemberToFrontend(res);
+  },
+
+  /**
+   * Met à jour un membre du staff existant
+   */
+  async updateStaffMember(
+    id: number | string,
+    data: Partial<{
+      name: string;
+      role: string;
+      department: string;
+      email: string;
+      phone: string;
+      contract_type: string;
+      qualifications: string[];
+      assigned_teams: string[];
+      access_level: 'Admin' | 'Manager' | 'Coach' | 'Medical' | 'Staff';
+    }>
+  ): Promise<StaffMember> {
+    const res = await apiFetch<BackendStaffMember>(`/hr-contracts/staff-members/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return mapBackendStaffMemberToFrontend(res);
+  },
+
+  /**
+   * Licencie (supprime) un membre du staff
+   */
+  async deleteStaffMember(id: number | string): Promise<void> {
+    await apiFetch<void>(`/hr-contracts/staff-members/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+

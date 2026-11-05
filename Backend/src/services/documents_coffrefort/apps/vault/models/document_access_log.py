@@ -2,9 +2,10 @@ from django.db import models
 from apps.vault.models.vault_document import VaultDocument
 
 
-class AccessType(models.TextChoices):
+class AccessType(models.TextChoices):  
     READ = 'READ', 'Lecture'
     DOWNLOAD = 'DOWNLOAD', 'Téléchargement'
+    UPLOAD = 'UPLOAD', 'Dépôt de fichier'
     PRESIGNED_URL_GENERATED = 'PRESIGNED_URL_GENERATED', 'URL Pré-signée'
 
 

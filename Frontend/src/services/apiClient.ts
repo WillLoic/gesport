@@ -55,10 +55,15 @@ export async function apiFetch<T = any>(
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
   const accessToken = getAccessToken();
 
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   };
+  if (isFormData && headers['Content-Type'] === 'application/json') {
+    delete headers['Content-Type'];
+  }
 
   if (accessToken) {
     headers['Authorization'] = `Bearer ${accessToken}`;

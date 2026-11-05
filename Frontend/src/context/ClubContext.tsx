@@ -43,7 +43,7 @@ import { medicalService } from '../services/medicalService';
 import { academyService } from '../services/academyService';
 import { recruitmentService } from '../services/recruitmentService';
 import { inventoryService, fleetService, procurementService } from '../services/operationsService';
-import { vaultService, governanceService, hrContractsService } from '../services/documentsService';
+import { vaultService, governanceService, hrContractsService, staffMemberService } from '../services/documentsService';
 import { ledgerService, invoicingService, sponsorshipService } from '../services/financeService';
 import { chatService } from '../services/messagingService';
 import {
@@ -216,10 +216,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Membres synchronisés avec le microservice sport_perf/membres (initialement vide avant chargement DB)
   const [members, setMembers] = useState<Member[]>([]);
 
-  const [staff, setStaff] = useState<StaffMember[]>(() => {
-    const saved = localStorage.getItem('sportflow_staff');
-    return saved ? JSON.parse(saved) : INITIAL_STAFF;
-  });
+  // Staff membres synchronisés avec le microservice documents_coffrefort (hr_contracts/staff-members)
+  const [staff, setStaff] = useState<StaffMember[]>([]);
 
   // Équipes synchronisées avec le microservice sport_perf/teams (initialement vide avant chargement DB)
   const [teams, setTeams] = useState<Team[]>([]);
@@ -265,22 +263,22 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     const saved = localStorage.getItem('sportflow_docs');
-    return saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [meetings, setMeetings] = useState<ClubMeeting[]>(() => {
     const saved = localStorage.getItem('sportflow_meetings');
-    return saved ? JSON.parse(saved) : INITIAL_MEETINGS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [contracts, setContracts] = useState<StaffContract[]>(() => {
     const saved = localStorage.getItem('sportflow_contracts');
-    return saved ? JSON.parse(saved) : INITIAL_CONTRACTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [leaves, setLeaves] = useState<LeaveRequest[]>(() => {
     const saved = localStorage.getItem('sportflow_leaves');
-    return saved ? JSON.parse(saved) : INITIAL_LEAVES;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [finances, setFinances] = useState<FinancialTransaction[]>(() => {
@@ -515,7 +513,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     vaultService
       .getDocuments()
       .then((remoteDocs) => {
-        if (remoteDocs && remoteDocs.length > 0) {
+        if (remoteDocs) {
           setDocuments(remoteDocs);
         }
       })
@@ -529,7 +527,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     governanceService
       .getAssemblies()
       .then((remoteAssemblies) => {
-        if (remoteAssemblies && remoteAssemblies.length > 0) {
+        if (remoteAssemblies) {
           setMeetings(remoteAssemblies);
         }
       })
@@ -543,7 +541,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hrContractsService
       .getContracts()
       .then((remoteContracts) => {
-        if (remoteContracts && remoteContracts.length > 0) {
+        if (remoteContracts) {
           setContracts(remoteContracts);
         }
       })
@@ -552,12 +550,25 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   }, []);
 
+  // Chargement initial des membres du staff depuis le microservice documents_coffrefort (hr_contracts/staff-members)
+  useEffect(() => {
+    staffMemberService
+      .getStaffMembers()
+      .then((remoteStaff) => {
+        setStaff(remoteStaff || []);
+      })
+      .catch((err) => {
+        console.warn('Microservice documents_coffrefort (staff-members) non disponible:', err);
+        setStaff([]);
+      });
+  }, []);
+
   // Chargement initial des congés staff depuis le microservice documents_coffrefort (hr_contracts)
   useEffect(() => {
     hrContractsService
       .getLeaves()
       .then((remoteLeaves) => {
-        if (remoteLeaves && remoteLeaves.length > 0) {
+        if (remoteLeaves) {
           setLeaves(remoteLeaves);
         }
       })

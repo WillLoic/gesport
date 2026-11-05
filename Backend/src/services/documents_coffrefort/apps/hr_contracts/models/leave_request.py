@@ -12,6 +12,7 @@ class LeaveStatus(models.TextChoices):
     PENDING = 'PENDING', 'En attente'
     APPROVED = 'APPROVED', 'Approuvé'
     REJECTED = 'REJECTED', 'Refusé'
+    COMPLETED = 'COMPLETED', 'Terminé'
 
 
 class LeaveRequest(models.Model):

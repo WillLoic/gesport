@@ -45,6 +45,26 @@ class GeneralAssemblyDetailView(APIView):
         serializer = GeneralAssemblySerializer(assembly)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def put(self, request, pk):
+        assembly = get_assembly_by_id(pk)
+        if not assembly:
+            return Response({'error': 'Assemblée générale non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = GeneralAssemblySerializer(assembly, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(GeneralAssemblySerializer(assembly).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
+
+    def delete(self, request, pk):
+        assembly = get_assembly_by_id(pk)
+        if not assembly:
+            return Response({'error': 'Assemblée générale non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        assembly.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class ResolutionListCreateView(APIView):
     def get(self, request, assembly_pk):
@@ -72,10 +92,17 @@ class ResolutionVoteView(APIView):
         res = Resolution.objects.filter(pk=pk).first()
         if not res:
             return Response({'error': 'Résolution non trouvée'}, status=status.HTTP_404_NOT_FOUND)
-        votes_for = int(request.data.get('votes_for', 0))
-        votes_against = int(request.data.get('votes_against', 0))
-        votes_abstain = int(request.data.get('votes_abstain', 0))
-        updated_res = vote_on_resolution(res, votes_for, votes_against, votes_abstain)
+        vote_type = request.data.get('type')
+        votes_for = request.data.get('votes_for')
+        votes_against = request.data.get('votes_against')
+        votes_abstain = request.data.get('votes_abstain')
+        updated_res = vote_on_resolution(
+            res,
+            votes_for=int(votes_for) if votes_for is not None else None,
+            votes_against=int(votes_against) if votes_against is not None else None,
+            votes_abstain=int(votes_abstain) if votes_abstain is not None else None,
+            vote_type=vote_type
+        )
         return Response(ResolutionSerializer(updated_res).data, status=status.HTTP_200_OK)
 
 
