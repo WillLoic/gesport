@@ -6,7 +6,7 @@ class ChannelMessage(models.Model):
     channel = models.ForeignKey(ChatChannel, on_delete=models.CASCADE, related_name='messages')
     sender_id = models.BigIntegerField(db_index=True)
     sender_name = models.CharField(max_length=150)
-    content = models.TextField()
+    content = models.TextField(blank=True, default='')
     attachment_url = models.URLField(max_length=500, blank=True, null=True)
     is_pinned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

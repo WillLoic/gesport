@@ -25,8 +25,16 @@ class ChatChannelSerializer(serializers.ModelSerializer):
 
 
 class ChannelMessageSerializer(serializers.ModelSerializer):
+    content = serializers.CharField(required=False, allow_blank=True, default='')
+
     class Meta:
         model = ChannelMessage
         fields = ['id', 'channel', 'sender_id', 'sender_name', 'content', 'attachment_url', 'is_pinned', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'channel', 'created_at']
 
+    def validate(self, attrs):
+        content = attrs.get('content', '').strip()
+        attachment_url = attrs.get('attachment_url')
+        if not content and not attachment_url:
+            raise serializers.ValidationError("Le message doit contenir du texte ou une pièce jointe.")
+        return attrs

@@ -102,6 +102,24 @@ export function mapBackendMessageToFrontend(msg: BackendChannelMessage): ChatMes
   const dateObj = msg.created_at ? new Date(msg.created_at) : new Date();
   const timestamp = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+  let attachments = undefined;
+  if (msg.attachment_url) {
+    const rawName = msg.attachment_url.split('/').pop() || 'Pièce jointe';
+    const cleanName = rawName.includes('_') ? rawName.substring(rawName.indexOf('_') + 1) : rawName;
+    const isImg = /\.(png|jpe?g|webp|gif|svg)$/i.test(rawName);
+    const isPdf = /\.pdf$/i.test(rawName);
+    const isVid = /\.(mp4|mov|avi|webm)$/i.test(rawName);
+    const isAud = /\.(mp3|wav|ogg)$/i.test(rawName);
+    const fileType = isImg ? 'IMAGE' : isPdf ? 'PDF' : isVid ? 'VIDEO' : isAud ? 'AUDIO' : 'DOC';
+
+    attachments = [{
+      name: cleanName,
+      size: 'Fichier joint',
+      type: fileType,
+      url: msg.attachment_url,
+    }];
+  }
+
   return {
     id: String(msg.id),
     channelId: String(msg.channel),
@@ -109,10 +127,8 @@ export function mapBackendMessageToFrontend(msg: BackendChannelMessage): ChatMes
     senderRole: 'Membre du Club',
     content: msg.content,
     timestamp,
-    isPinned: msg.is_pinned,
-    attachments: msg.attachment_url
-      ? [{ name: 'Pièce jointe', size: '1.2 MB', type: 'PDF' }]
-      : undefined,
+    isPinned: Boolean(msg.is_pinned),
+    attachments,
   };
 }
 
@@ -157,10 +173,34 @@ export const chatService = {
   },
 
   /**
-   * Récupère l'historique des messages d'un canal
+   * Modifie les informations d'un salon
    */
-  async getChannelMessages(channelId: number | string): Promise<ChatMessage[]> {
-    const messages = await apiFetch<BackendChannelMessage[]>(`/chat/channels/${channelId}/messages/`);
+  async updateChannel(
+    channelId: number | string,
+    data: { name?: string; description?: string; channel_type?: 'PUBLIC' | 'PRIVATE' | 'TEAM' }
+  ): Promise<ChatChannel> {
+    const res = await apiFetch<BackendChatChannel>(`/chat/channels/${channelId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return mapBackendChannelToFrontend(res);
+  },
+
+  /**
+   * Supprime un salon de discussion
+   */
+  async deleteChannel(channelId: number | string): Promise<void> {
+    await apiFetch(`/chat/channels/${channelId}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Récupère l'historique des messages d'un canal (avec support du rafraîchissement par since_id)
+   */
+  async getChannelMessages(channelId: number | string, sinceId?: number | string): Promise<ChatMessage[]> {
+    const query = sinceId ? `?since_id=${sinceId}` : '';
+    const messages = await apiFetch<BackendChannelMessage[]>(`/chat/channels/${channelId}/messages/${query}`);
     return (messages || []).map(mapBackendMessageToFrontend);
   },
 
@@ -186,6 +226,25 @@ export const chatService = {
     const res = await apiFetch<BackendChannelMessage>(`/chat/channels/${channelId}/messages/`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+    return mapBackendMessageToFrontend(res);
+  },
+
+  /**
+   * Supprime un message du canal
+   */
+  async deleteMessage(messageId: number | string): Promise<void> {
+    await apiFetch(`/chat/messages/${messageId}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Épingle ou désépingle un message
+   */
+  async togglePinMessage(messageId: number | string): Promise<ChatMessage> {
+    const res = await apiFetch<BackendChannelMessage>(`/chat/messages/${messageId}/`, {
+      method: 'PATCH',
     });
     return mapBackendMessageToFrontend(res);
   },

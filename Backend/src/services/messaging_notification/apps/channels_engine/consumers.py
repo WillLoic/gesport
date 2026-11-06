@@ -1,5 +1,13 @@
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
+try:
+    from channels.generic.websocket import AsyncWebsocketConsumer
+    from channels.db import database_sync_to_async
+except ImportError:
+    # Fallback classe factice si channels n'est pas installé dans l'environnement local
+    class AsyncWebsocketConsumer:
+        pass
+    def database_sync_to_async(func):
+        return func
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -27,22 +35,51 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data):
-        """Reçoit un message du client WebSocket et le diffuse au groupe."""
+        """Reçoit un message du client WebSocket, le sauvegarde en BD et le diffuse au groupe."""
         try:
             data = json.loads(text_data)
-            message = data.get('message', '')
-            sender_id = data.get('sender_id', 0)
-            sender_name = data.get('sender_name', 'Anonyme')
+            content = data.get('content') or data.get('message', '')
+            sender_id = data.get('sender_id', 1)
+            sender_name = data.get('sender_name', 'Membre du Club')
+            attachment_url = data.get('attachment_url')
+
+            if not content.strip() and not attachment_url:
+                return
+
+            from apps.chat.models import ChannelMessage, ChatChannel
+
+            @database_sync_to_async
+            def save_msg():
+                try:
+                    ch = ChatChannel.objects.get(id=int(self.channel_id))
+                    return ChannelMessage.objects.create(
+                        channel=ch,
+                        sender_id=sender_id,
+                        sender_name=sender_name,
+                        content=content,
+                        attachment_url=attachment_url
+                    )
+                except Exception:
+                    return None
+
+            msg_obj = await save_msg()
+            msg_id = msg_obj.id if msg_obj else None
+            created_at = msg_obj.created_at.isoformat() if msg_obj and msg_obj.created_at else None
 
             # Diffuser le message à tous les membres du salon
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'chat_message',
-                    'message': message,
+                    'id': msg_id,
+                    'message': content,
+                    'content': content,
                     'sender_id': sender_id,
                     'sender_name': sender_name,
                     'channel_id': self.channel_id,
+                    'attachment_url': attachment_url,
+                    'is_pinned': False,
+                    'created_at': created_at,
                 }
             )
         except (json.JSONDecodeError, KeyError):
@@ -52,10 +89,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Envoie un message de chat au client WebSocket."""
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
-            'message': event['message'],
-            'sender_id': event['sender_id'],
-            'sender_name': event['sender_name'],
-            'channel_id': event['channel_id'],
+            'id': event.get('id'),
+            'message': event.get('message') or event.get('content', ''),
+            'content': event.get('content') or event.get('message', ''),
+            'sender_id': event.get('sender_id'),
+            'sender_name': event.get('sender_name'),
+            'channel_id': event.get('channel_id'),
+            'attachment_url': event.get('attachment_url'),
+            'is_pinned': event.get('is_pinned', False),
+            'created_at': event.get('created_at'),
         }))
 
 

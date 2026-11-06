@@ -538,7 +538,7 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   isPinned?: boolean;
-  attachments?: { name: string; size: string; type: string }[];
+  attachments?: { name: string; size: string; type: string; url?: string }[];
 }
 
 export interface ChatChannel {

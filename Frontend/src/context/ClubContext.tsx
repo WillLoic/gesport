@@ -231,12 +231,12 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem('sportflow_attendance');
-    return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [matchStats, setMatchStats] = useState<MatchStats[]>(() => {
     const saved = localStorage.getItem('sportflow_match_stats');
-    return saved ? JSON.parse(saved) : INITIAL_MATCH_STATS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Dossiers médicaux synchronisés uniquement avec le microservice backend (sport_perf / medical)
@@ -253,12 +253,12 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [posProducts, setPosProducts] = useState<PosProduct[]>(() => {
     const saved = localStorage.getItem('sportflow_pos_products');
-    return saved ? JSON.parse(saved) : INITIAL_POS_PRODUCTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [posOrders, setPosOrders] = useState<PosOrder[]>(() => {
     const saved = localStorage.getItem('sportflow_pos_orders');
-    return saved ? JSON.parse(saved) : INITIAL_POS_ORDERS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
@@ -334,12 +334,12 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [channels, setChannels] = useState<ChatChannel[]>(() => {
     const saved = localStorage.getItem('sportflow_channels');
-    return saved ? JSON.parse(saved) : INITIAL_CHANNELS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem('sportflow_messages');
-    return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -624,17 +624,21 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     chatService
       .getChannels(1)
       .then(async (remoteChannels) => {
-        if (remoteChannels && remoteChannels.length > 0) {
+        if (remoteChannels) {
           setChannels(remoteChannels);
           // Charger les messages du premier canal
           try {
-            const firstChanId = remoteChannels[0].id;
-            const remoteMsgs = await chatService.getChannelMessages(firstChanId);
-            if (remoteMsgs && remoteMsgs.length > 0) {
-              setMessages(remoteMsgs);
+            if (remoteChannels.length > 0) {
+              const firstChanId = remoteChannels[0].id;
+              const remoteMsgs = await chatService.getChannelMessages(firstChanId);
+              if (remoteMsgs) {
+                setMessages(remoteMsgs);
+              }
+            } else {
+              setMessages([]);
             }
           } catch {
-            // Ignorer si pas de messages
+            setMessages([]);
           }
         }
       })
